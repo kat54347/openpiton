@@ -25,3 +25,7 @@ yosys read_verilog "${DV_ROOT}/design/chip/tile/dynamic_node/common/rtl/space_av
 
 yosys read_verilog "${DV_ROOT}/design/chip/tile/common/rtl/valrdy_to_credit.v"
 yosys read_verilog "${DV_ROOT}/design/chip/tile/common/rtl/credit_to_valrdy.v"
+
+
+# check design hierarchy
+yosys hierarchy -top ${DESIGN_NAME}
