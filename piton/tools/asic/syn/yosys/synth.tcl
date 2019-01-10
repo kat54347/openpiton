@@ -2,7 +2,7 @@ if {[info exists ::env(ASIC_PROCESS)]} {
     set ASIC_PROCESS $::env(ASIC_PROCESS)
 } else {
     puts "====================================\n"
-    puts " Warning: ASIC_PROCESS not defined. \n"
+    puts " Error: process not defined. \n"
     puts "====================================\n"
     exit;
 }
@@ -10,6 +10,7 @@ if {[info exists ::env(ASIC_PROCESS)]} {
 set DV_ROOT $::env(DV_ROOT)
 
 eval "source script/module_setup.tcl"
+
 
 # translate processes (always blocks)
 yosys proc
