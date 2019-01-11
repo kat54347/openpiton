@@ -30,11 +30,11 @@ yosys opt
 
 if {$ASIC_PROCESS eq "asap7"} {
     set ASAP7_IP $::env(ASAP7_IP)
-    # mapping flip-flops to mycells.lib
-    yosys dfflibmap -liberty "${ASAP7_IP}/asap7libs_24/lib/asap7sc7p5t_24_SEQ_RVT_TT.lib"
+    # mapping logic to ASAP7 library
+    yosys abc -dff -liberty "${ASAP7_IP}/asap7libs_24/lib/asap_7nm.lib" -D 200
 
-    # mapping logic to mycells.lib
-    yosys abc -liberty "${ASAP7_IP}/asap7libs_24/lib/asap_7nm.lib"
+    # mapping flip-flops to ASAP7 library
+    yosys dfflibmap -liberty "${ASAP7_IP}/asap7libs_24/lib/asap7sc7p5t_24_SEQ_RVT_TT.lib"
 }
 
 set RESULTS_DIR "results"
