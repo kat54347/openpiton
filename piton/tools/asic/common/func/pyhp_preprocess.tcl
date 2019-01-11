@@ -25,21 +25,14 @@
 
 # Function to preprocess a list of verilog files with PyHP
 proc pyhp_preprocess { args } {
-    # parse_proc_arguments -args $args arguments
-
-    if {[info exists arguments(-rtl)]} {
-        set RTL_SOURCE_FILES $arguments(-rtl)
-    } else {
-        puts "Error: pyhp_preprocess no RTL files provided."
-        return 1
-    }
 
     set GEN_RTL_SOURCE_FILES ""
-    foreach RTL_SOURCE_FILE ${RTL_SOURCE_FILES} {
+    foreach RTL_SOURCE_FILE ${args} {
+        puts "${RTL_SOURCE_FILE}"
         set PYV_SOURCE_FILE  "${RTL_SOURCE_FILE}.pyv"
         # File gets preprocessed if a PYV version exists
         if {[file exists ${PYV_SOURCE_FILE}]} {
-            puts "RM-Info: ${PYV_SOURCE_FILE} exists! Preprocessing..."
+            puts "${PYV_SOURCE_FILE} exists! Preprocessing..."
 
             # Setup temporary filename for preprocessed verilog
             set RTL_SOURCE_FILENAME_LEN [string length ${RTL_SOURCE_FILE}]
@@ -48,7 +41,7 @@ proc pyhp_preprocess { args } {
             append GEN_RTL_SOURCE_FILE [string index ${RTL_SOURCE_FILE} [expr ${RTL_SOURCE_FILENAME_LEN} - 1]]
 
             # Run PyHP
-            sh pyhp.py ${PYV_SOURCE_FILE} > ${GEN_RTL_SOURCE_FILE}
+            exec pyhp.py ${PYV_SOURCE_FILE} > ${GEN_RTL_SOURCE_FILE}
 
             # Append to new source file list
             set GEN_RTL_SOURCE_FILES "${GEN_RTL_SOURCE_FILES} ${GEN_RTL_SOURCE_FILE}"
