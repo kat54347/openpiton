@@ -230,16 +230,16 @@ wire [`L1D_DATA_ENTRY_WIDTH-1:0] way_mask_e =
 // !MERGE_L1_DCACHE && SRAM_LSU_DCACHE
 
 
-sram_l1d_data_piton dcache_way_01
+sram_l1d_data_piton dcache_way_0
 (
   .MEMCLK(rclk),
   .RESET_N(arst_l),
   .CE(dcache_wvld_e | dcache_rvld_e),
   .A(dcache_rwaddr_e[`L1D_ADDRESS_HI:4]),
-  .DIN({dcache_wdata_e, dcache_wdata_e}),
-  .BW({way1_write_mask, way0_write_mask}),
+  .DIN(dcache_wdata_e),
+  .BW(way0_write_mask),
   .RDWEN(~dcache_wvld_e),
-  .DOUT({temp_w1a_reg, temp_w0a_reg}),
+  .DOUT(temp_w0a_reg),
 
   .BIST_COMMAND(rtap_srams_bist_command),
   .BIST_DIN(rtap_srams_bist_data),
@@ -247,16 +247,50 @@ sram_l1d_data_piton dcache_way_01
   .SRAMID(`BIST_ID_L1_DCACHE_W01)
 );
 
-sram_l1d_data_piton dcache_way_23
+sram_l1d_data_piton dcache_way_1
 (
   .MEMCLK(rclk),
   .RESET_N(arst_l),
   .CE(dcache_wvld_e | dcache_rvld_e),
   .A(dcache_rwaddr_e[`L1D_ADDRESS_HI:4]),
-  .DIN({dcache_wdata_e, dcache_wdata_e}),
-  .BW({way3_write_mask, way2_write_mask}),
+  .DIN(dcache_wdata_e),
+  .BW(way1_write_mask),
   .RDWEN(~dcache_wvld_e),
-  .DOUT({temp_w3a_reg, temp_w2a_reg}),
+  .DOUT(temp_w1a_reg),
+
+  .BIST_COMMAND(rtap_srams_bist_command),
+  .BIST_DIN(rtap_srams_bist_data),
+  .BIST_DOUT(sram_dcache_w01_rtap_data),
+  .SRAMID(`BIST_ID_L1_DCACHE_W01)
+);
+
+sram_l1d_data_piton dcache_way_2
+(
+  .MEMCLK(rclk),
+  .RESET_N(arst_l),
+  .CE(dcache_wvld_e | dcache_rvld_e),
+  .A(dcache_rwaddr_e[`L1D_ADDRESS_HI:4]),
+  .DIN(dcache_wdata_e),
+  .BW(way2_write_mask),
+  .RDWEN(~dcache_wvld_e),
+  .DOUT(temp_w2a_reg),
+
+  .BIST_COMMAND(rtap_srams_bist_command),
+  .BIST_DIN(rtap_srams_bist_data),
+  .BIST_DOUT(sram_dcache_w23_rtap_data),
+  .SRAMID(`BIST_ID_L1_DCACHE_W23)
+);
+
+sram_l1d_data_piton dcache_way_3
+(
+  .MEMCLK(rclk),
+  .RESET_N(arst_l),
+  .CE(dcache_wvld_e | dcache_rvld_e),
+  .A(dcache_rwaddr_e[`L1D_ADDRESS_HI:4]),
+  .DIN(dcache_wdata_e),
+  .BW(way3_write_mask),
+  .RDWEN(~dcache_wvld_e),
+  .DOUT(temp_w3a_reg),
 
   .BIST_COMMAND(rtap_srams_bist_command),
   .BIST_DIN(rtap_srams_bist_data),
@@ -584,7 +618,7 @@ assign dcache_rdata_msb_w0_m[7:0] = dcache_arry_data_sel_m ?
 %>
 
 <%
-  GenFor("assign dcache_rdata_msb_m[(8*(__WAY+1))-1 -: 8] = dcache_rdata_msb_w__WAY_m;", CONFIG_L1D_ASSOCIATIVITY); 
+  GenFor("assign dcache_rdata_msb_m[(8*(__WAY+1))-1 -: 8] = dcache_rdata_msb_w__WAY_m;", CONFIG_L1D_ASSOCIATIVITY);
 %>
 
    // wire [63:0] rdata_w0_m;
@@ -592,7 +626,7 @@ assign dcache_rdata_msb_w0_m[7:0] = dcache_arry_data_sel_m ?
    // wire [63:0] rdata_w2_m;
    // wire [63:0] rdata_w3_m;
 <%
-  GenFor("wire [63:0] rdata_w__WAY_m;", CONFIG_L1D_ASSOCIATIVITY); 
+  GenFor("wire [63:0] rdata_w__WAY_m;", CONFIG_L1D_ASSOCIATIVITY);
 %>
 
 //2-to-1 mux
@@ -604,7 +638,7 @@ assign rdata_w0_m[63:0] = dcache_arry_data_sel_m ?
 // assign rdata_w1_m[63:0] = dcache_rdata_w1_m[63:0];
 // assign rdata_w2_m[63:0] = dcache_rdata_w2_m[63:0];
 // assign rdata_w3_m[63:0] = dcache_rdata_w3_m[63:0];
-   
+
 <%
   template = '''
     assign rdata_w__WAY_m[63:0] = dcache_rdata_w__WAY_m[63:0];

@@ -22,5 +22,8 @@
 # ========== Copyright Header End ============================================
 
 # Script to run design compiler for OpenPiton
+export PITON_PROCESS=$1
+export MODULE_PATH=$2
+export BUILD_ID=$3
 
-dc_shell-t -topographical -f $DV_ROOT/asicflow/gf14_arm/generic/syn/dc/dc.tcl > dc_shell.log
+dc_shell-t -topographical -f $DV_ROOT/asicflow/${PITON_PROCESS}/generic/syn/dc/dc.tcl > dc_shell.log

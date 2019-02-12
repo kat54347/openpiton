@@ -1086,12 +1086,20 @@ sub gen_flist
 
   foreach my $flist (@{$opt{flist}}) {
     $flist =~ s/\$(\w+)/$ENV{$1}/g ;
-
     # look for IBM flists
     if ($opt{ibm}) {
        my $ibmflist = $flist . ".ibm";
        if (-e $ibmflist) {
           $flist = $ibmflist;
+          # print("debug: IBM flist found: $flist\n");
+       }
+    }
+
+    # look for GF14 flists
+    if ($opt{gf14}) {
+       my $gf14flist = $flist . ".gf14";
+       if (-e $gf14flist) {
+          $flist = $gf14flist;
           # print("debug: IBM flist found: $flist\n");
        }
     }
@@ -1140,8 +1148,12 @@ sub gen_flist
       # Now we run pyphp
 
       my $ibmfile = (split(' ',substr($line, 0, -1)))[-1] . ".ibm.v";
+      my $gf14file = (split(' ',substr($line, 0, -1)))[-1] . ".gf14.v";
       if ($opt{ibm} and -e $ibmfile) {
            $line = $ibmfile . "\n";
+           # print("debug: IBM sram found: $line\n");
+      } elsif ($opt{gf14} and -e $gf14file) {
+           $line = $gf14file . "\n";
            # print("debug: IBM sram found: $line\n");
       } else {
         my $linepyv = (split(' ',substr($line, 0, -1)))[-1] . ".pyv";
@@ -2502,6 +2514,7 @@ sub parse_args
             'log_all!',
             'debug_all!',
             'ibm!',
+            'gf14!',
             'ed_enable!',
             'ed_sync_method=s',
             'slurm!',

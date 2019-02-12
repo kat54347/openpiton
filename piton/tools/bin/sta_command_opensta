@@ -1,0 +1,6 @@
+PITON_PROCESS=$1
+MODULE_PATH=$2
+echo "$DV_ROOT/asicflow/$PITON_PROCESS/specific/$MODULE_PATH/
+asicflow/sta/opensta/script/opensta.tcl > sta.log"
+sta $DV_ROOT/asicflow/$PITON_PROCESS/specific/$MODULE_PATH/
+asicflow/sta/opensta/script/opensta.tcl > sta.log

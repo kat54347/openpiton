@@ -559,16 +559,35 @@ module bw_r_icd(
     reg  [543:0] wrmask_expanded_bf;
     wire [135:0] wrmask_bf;
 
-sram_l1i_data icache_way_10
+// TODO: fix SRAMID
+
+sram_l1i_data icache_way_0
 (
     .MEMCLK(rclk),
     .RESET_N(reset_l),
     .CE(fcl_icd_rdreq_bf | fcl_icd_wrreq_bf),
     .A(index_bf[`IC_IDX_HI:4]),
-    .DIN(wrdata_expanded_bf[271:0]),
-    .BW(wrmask_expanded_bf[271:0]),
+    .DIN(wrdata_expanded_bf[135:0]),
+    .BW(wrmask_expanded_bf[135:0]),
     .RDWEN(~fcl_icd_wrreq_bf),
-    .DOUT(read_data_f[271:0]),
+    .DOUT(read_data_f[135:0]),
+
+    .BIST_COMMAND(rtap_srams_bist_command),
+    .BIST_DIN(rtap_srams_bist_data),
+    .BIST_DOUT(sram_icache_w10_rtap_data),
+    .SRAMID(`BIST_ID_L1_ICACHE_W10)
+);
+
+sram_l1i_data icache_way_1
+(
+    .MEMCLK(rclk),
+    .RESET_N(reset_l),
+    .CE(fcl_icd_rdreq_bf | fcl_icd_wrreq_bf),
+    .A(index_bf[`IC_IDX_HI:4]),
+    .DIN(wrdata_expanded_bf[271:136]),
+    .BW(wrmask_expanded_bf[271:136]),
+    .RDWEN(~fcl_icd_wrreq_bf),
+    .DOUT(read_data_f[271:136]),
 
     .BIST_COMMAND(rtap_srams_bist_command),
     .BIST_DIN(rtap_srams_bist_data),
@@ -577,16 +596,33 @@ sram_l1i_data icache_way_10
 );
 
 
-sram_l1i_data icache_way_32
+sram_l1i_data icache_way_2
 (
     .MEMCLK(rclk),
     .RESET_N(reset_l),
     .CE(fcl_icd_rdreq_bf | fcl_icd_wrreq_bf),
     .A(index_bf[`IC_IDX_HI:4]),
-    .DIN(wrdata_expanded_bf[543:272]),
-    .BW(wrmask_expanded_bf[543:272]),
+    .DIN(wrdata_expanded_bf[407:272]),
+    .BW(wrmask_expanded_bf[407:272]),
     .RDWEN(~fcl_icd_wrreq_bf),
-    .DOUT(read_data_f[543:272]),
+    .DOUT(read_data_f[407:272]),
+
+    .BIST_COMMAND(rtap_srams_bist_command),
+    .BIST_DIN(rtap_srams_bist_data),
+    .BIST_DOUT(sram_icache_w32_rtap_data),
+    .SRAMID(`BIST_ID_L1_ICACHE_W32)
+);
+
+sram_l1i_data icache_way_3
+(
+    .MEMCLK(rclk),
+    .RESET_N(reset_l),
+    .CE(fcl_icd_rdreq_bf | fcl_icd_wrreq_bf),
+    .A(index_bf[`IC_IDX_HI:4]),
+    .DIN(wrdata_expanded_bf[543:408]),
+    .BW(wrmask_expanded_bf[543:408]),
+    .RDWEN(~fcl_icd_wrreq_bf),
+    .DOUT(read_data_f[543:408]),
 
     .BIST_COMMAND(rtap_srams_bist_command),
     .BIST_DIN(rtap_srams_bist_data),

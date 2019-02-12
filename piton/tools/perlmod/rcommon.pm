@@ -86,7 +86,7 @@ sub process_blocks {
             $block_line = $_ ;
             if (!block_line_is_comment($block_line))
             {
-                $block_data = process_block_line ($block_line); 
+                $block_data = process_block_line ($block_line);
                 $block_count++;
                 push @block_match_list, $block_data ;
             }
@@ -108,7 +108,7 @@ sub process_blocks {
                     }
                 }
             }
-        }                                                                                                            
+        }
     }
     close(BLK_IN);
 
@@ -130,6 +130,7 @@ sub create_slurm_script {
     print BLK_CMD "#!/bin/bash\n";
     print BLK_CMD "#SBATCH -n $scores\n";
     print BLK_CMD "#SBATCH -N 1\n";
+    print BLK_CMD "#SBATCH -C broadwell\n";
     if ($smem ne "") {
         print BLK_CMD "#SBATCH --mem $smem\n";
     }
@@ -146,7 +147,7 @@ sub create_slurm_script {
     print BLK_CMD "exit";
     close(BLK_CMD);
 
-    return 0; 
+    return 0;
 }
 
 sub submit_slurm_job {

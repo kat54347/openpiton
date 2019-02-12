@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # Copyright (c) 2016 Princeton University
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #     * Redistributions of source code must retain the above copyright
@@ -12,7 +12,7 @@
 #     * Neither the name of Princeton University nor the
 #       names of its contributors may be used to endorse or promote products
 #       derived from this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY PRINCETON UNIVERSITY "AS IS" AND
 # ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 # WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -26,285 +26,308 @@
 
 # Description: This script is used to check logs for
 # synthesis and backend runs.  Its pretty simple,
-# greps for warnings and errors and allows for 
+# greps for warnings and errors and allows for
 # exceptions
 # Author: mmckeown
 
-import os, sys
+import os
+import sys
 import re
 
-class CmdArgs :
+
+class CmdArgs:
     prog = None
+    process = None
+    tool = None
 
 REAL_PROG = os.path.basename(sys.argv[0])
-VALID_PROGS = [ "csyn", \
-                "csta", \
-                "crvs", \
-                "cpar", \
-                "cmerge_gds", \
-                "cdrc", \
-                "clvs" ]
+VALID_PROGS = ["csyn",
+               "csta",
+               "crvs",
+               "cpar",
+               "cmerge_gds",
+               "cdrc",
+               "clvs"]
+
 
 def usage():
-    print "Usage: " + REAL_PROG + " [program]"
+    print "Usage: " + REAL_PROG + " [program] [process] [tool]"
     print "   Where program is one of: " + ", ".join(VALID_PROGS)
 
-def parse_cmd_args ():
-    if len(sys.argv) != 2:
+
+def parse_cmd_args():
+    if len(sys.argv) != 4:
         usage()
         sys.exit(1)
 
     args = CmdArgs()
     args.prog = sys.argv[1]
+    args.process = sys.argv[2]
+    args.tool = sys.argv[3]
 
     # validate
-    if not args.prog in VALID_PROGS :
+    if not args.prog in VALID_PROGS:
         print REAL_PROG + ": ERROR: Invalid program specified"
         usage()
         sys.exit(1)
-    
+
     return args
 
-def find_log_files (prog):
+
+def find_log_files(prog):
     log_files = []
     if prog == "csyn":
-        if os.path.isfile("dc_shell.log") :
+        if os.path.isfile("dc_shell.log"):
             log_files.append("dc_shell.log")
         curr_log = "dc_shell_pass1.log"
         curr_pass = 1
-        while os.path.isfile(curr_log) :
+        while os.path.isfile(curr_log):
             log_files.append(curr_log)
             curr_pass += 1
-            curr_log = "dc_shell_pass" + str(curr_pass) + ".log" 
-    elif prog == "csta" :
-        if os.path.isfile("pt_shell.log") :
+            curr_log = "dc_shell_pass" + str(curr_pass) + ".log"
+    elif prog == "csta":
+        if os.path.isfile("pt_shell.log"):
             log_files.append("pt_shell.log")
         curr_log = "pt_shell_dc_pass1.log"
         curr_pass = 1
-        while os.path.isfile(curr_log) :
+        while os.path.isfile(curr_log):
             log_files.append(curr_log)
             curr_pass += 1
-            curr_log = "pt_shell_dc_pass" + str(curr_pass) + ".log" 
+            curr_log = "pt_shell_dc_pass" + str(curr_pass) + ".log"
         curr_log = "pt_shell_icc_pass1.log"
         curr_pass = 1
-        while os.path.isfile(curr_log) :
+        while os.path.isfile(curr_log):
             log_files.append(curr_log)
             curr_pass += 1
-            curr_log = "pt_shell_icc_pass" + str(curr_pass) + ".log" 
+            curr_log = "pt_shell_icc_pass" + str(curr_pass) + ".log"
         curr_log = "pt_shell_eco_pass1.log"
         curr_pass = 1
-        while os.path.isfile(curr_log) :
+        while os.path.isfile(curr_log):
             log_files.append(curr_log)
             curr_pass += 1
-            curr_log = "pt_shell_eco_pass" + str(curr_pass) + ".log" 
-    elif prog == "crvs" :
-        if os.path.isfile("fm_shell.log") :
+            curr_log = "pt_shell_eco_pass" + str(curr_pass) + ".log"
+    elif prog == "crvs":
+        if os.path.isfile("fm_shell.log"):
             log_files.append("fm_shell.log")
         curr_log = "fm_shell_dc_pass1.log"
         curr_pass = 1
-        while os.path.isfile(curr_log) :
+        while os.path.isfile(curr_log):
             log_files.append(curr_log)
             curr_pass += 1
-            curr_log = "fm_shell_dc_pass" + str(curr_pass) + ".log" 
+            curr_log = "fm_shell_dc_pass" + str(curr_pass) + ".log"
         curr_log = "fm_shell_icc_pass1.log"
         curr_pass = 1
-        while os.path.isfile(curr_log) :
+        while os.path.isfile(curr_log):
             log_files.append(curr_log)
             curr_pass += 1
-            curr_log = "fm_shell_icc_pass" + str(curr_pass) + ".log" 
+            curr_log = "fm_shell_icc_pass" + str(curr_pass) + ".log"
         curr_log = "fm_shell_eco_pass1.log"
         curr_pass = 1
-        while os.path.isfile(curr_log) :
+        while os.path.isfile(curr_log):
             log_files.append(curr_log)
             curr_pass += 1
             curr_log = "fm_shell_eco_pass" + str(curr_pass) + ".log"
-    elif prog == "cpar" :
-        if os.path.isfile("icc_shell.log") :
-            log_files.append("icc_shell.log")
-        if os.path.isfile("eco_shell.log") :
+    elif prog == "cpar":
+        if os.path.isfile("icc2_shell.log"):
+            log_files.append("icc2_shell.log")
+        if os.path.isfile("eco_shell.log"):
             log_files.append("eco_shell.log")
-        curr_log = "icc_shell_pass1.log"
+        curr_log = "icc2_shell_pass1.log"
         curr_pass = 1
-        while os.path.isfile(curr_log) :
+        while os.path.isfile(curr_log):
             log_files.append(curr_log)
             curr_pass += 1
-            curr_log = "icc_shell_pass" + str(curr_pass) + ".log" 
+            curr_log = "icc2_shell_pass" + str(curr_pass) + ".log"
         curr_log = "eco_shell_pass1.log"
         curr_pass = 1
-        while os.path.isfile(curr_log) :
+        while os.path.isfile(curr_log):
             log_files.append(curr_log)
             curr_pass += 1
-            curr_log = "eco_shell_pass" + str(curr_pass) + ".log" 
-    elif prog == "cmerge_gds" :
-        if os.path.isfile("merge_gds.log") :
+            curr_log = "eco_shell_pass" + str(curr_pass) + ".log"
+    elif prog == "cmerge_gds":
+        if os.path.isfile("merge_gds.log"):
             log_files.append("merge_gds.log")
-    elif prog == "cdrc" :
+    elif prog == "cdrc":
         if os.path.isfile("drcRun/calibre.drc.log"):
             log_files.append("drcRun/calibre.drc.log")
-    elif prog == "clvs" :
+    elif prog == "clvs":
         if os.path.isfile("lvsRun/calibre.lvs.log"):
-            log_files.append("lvsRun/calibre.lvs.log") 
+            log_files.append("lvsRun/calibre.lvs.log")
     else:
         raise Exception("PROGRAMMER ERROR")
 
     return log_files
 
-def get_glbl_exceptions_file(prog, dv_root):
-    if prog == "csyn" :
-        return os.path.join(dv_root, "tools/synopsys/script/syn/dc.excpt")
-    elif prog == "csta" :
-        return os.path.join(dv_root, "tools/synopsys/script/sta/pt.excpt")
-    elif prog == "crvs" :
-        return os.path.join(dv_root, "tools/synopsys/script/rvs/fm.excpt")
-    elif prog == "cpar" :
-        return os.path.join(dv_root, "tools/synopsys/script/par/icc.excpt")
-    elif prog == "cmerge_gds" :
-        return os.path.join(dv_root, "tools/synopsys/script/merge_gds/icwbev.excpt")
-    elif prog == "cdrc" :
-        return os.path.join(dv_root, "tools/calibre/script/drc/calibre.drc.excpt")
-    elif prog == "clvs" :
-        return os.path.join(dv_root, "tools/calibre/script/lvs/calibre.lvs.excpt")
+
+def get_glbl_exceptions_file(args, dv_root):
+    if args.prog == "csyn":
+        return os.path.join(dv_root, "asicflow/", args.process, "generic/syn/", args.tool, "dc.excpt")
+    elif args.prog == "csta":
+        return os.path.join(dv_root, "asicflow/", args.process, "generic/sta/", args.tool, "pt.excpt")
+    elif args.prog == "crvs":
+        return os.path.join(dv_root, "asicflow/", args.process, "generic/rvs/", args.tool, "fm.excpt")
+    elif args.prog == "cpar":
+        return os.path.join(dv_root, "asicflow/", args.process, "generic/par/", args.tool,
+                            "icc2.excpt")
+    elif args.prog == "cmerge_gds":
+        return os.path.join(dv_root, "asicflow/", args.process, "generic/merge_gds/", args.tool,
+                            "icwev.excpt")
+    elif args.prog == "cdrc":
+        return os.path.join(dv_root, "asicflow/", args.process, "generic/drc/", args.tool,
+                            "calibre.drc.excpt")
+    elif args.prog == "clvs":
+        return os.path.join(dv_root, "asicflow/", args.process, "generic/lvs/", args.tool,
+                            "calibre.lvs.excpt")
 
     raise Exception("PROGRAMMER ERROR")
 
+
 def get_local_exceptions_file(prog):
-    if prog == "csyn" :
+    if prog == "csyn":
         return "script/dc.excpt"
-    elif prog == "csta" :
+    elif prog == "csta":
         return "script/pt.excpt"
-    elif prog == "crvs" :
+    elif prog == "crvs":
         return "script/fm.excpt"
-    elif prog == "cpar" :
-        return "script/icc.excpt"
-    elif prog == "cmerge_gds" :
+    elif prog == "cpar":
+        return "script/icc2.excpt"
+    elif prog == "cmerge_gds":
         return "script/icwbev.excpt"
-    elif prog == "cdrc" :
+    elif prog == "cdrc":
         return "script/calibre.drc.excpt"
-    elif prog == "clvs" :
+    elif prog == "clvs":
         return "script/calibre.lvs.excpt"
-    
+
     raise Exception("PROGRAMER ERROR")
 
+
 def check_last_few_lines(prog, last_few):
-    if prog == "csyn" :
+    if prog == "csyn":
         return (last_few[0] == "exit\n" and last_few[1] == "\n" and last_few[2] == "Thank you...\n")
-    elif prog == "csta" :
+    elif prog == "csta":
         return (last_few[1] == "\n" and last_few[2] == "Thank you for using pt_shell!\n")
-    elif prog == "crvs" :
-        return (re.match("Elapsed time: \d+ seconds\n", last_few[0]) and
-                last_few[1] == "\n" and 
+    elif prog == "crvs":
+        return (re.match("Number of cores used: \d+\n", last_few[0]) and
+                last_few[1] == "\n" and
                 last_few[2] == "Thank you for using Formality (R)!\n")
-    elif prog == "cpar" :
-        return (last_few[0] == "\n" and last_few[1] == "Thank you...\n" and last_few[2] == "Exit IC Compiler!\n")
-    elif prog == "cmerge_gds" :
-        return (last_few[2] == "INFO : Merge GDSII successful!" or 
+    elif prog == "cpar":
+        return (re.match("CPU usage for this session:.+\n", last_few[0]) and
+                re.match("Elapsed time for this session:.+\n", last_few[1]) and
+                re.match("Thank you for using IC Compiler II.\n", last_few[2]))
+    elif prog == "cmerge_gds":
+        return (last_few[2] == "INFO : Merge GDSII successful!" or
                 re.match("\#-\> results/\S+\.gds.*", last_few[2]) or
                 re.match("\# END macro run \S+merge_gds\.tcl\n", last_few[2]))
-    elif prog == "cdrc" :
+    elif prog == "cdrc":
         return (last_few[2] == "####################      CALIBRE DRC LOG END      ####################\n")
-    elif prog == "clvs" :
+    elif prog == "clvs":
         return (last_few[2] == "####################      CALIBRE LVS LOG END      ####################\n")
 
-    raise Exception("PROGRAMER ERROR")    
+    raise Exception("PROGRAMER ERROR")
+
 
 def get_status_file(prog, log_file):
-    if prog == "csyn" :
+    if prog == "csyn":
         status_log_file = "syn_status.log"
         match = re.match("dc_shell_pass(\d+)\.log", log_file)
-        if match :
+        if match:
             status_log_file = "syn_status_pass" + match.group(1) + ".log"
         return status_log_file
-    elif prog == "csta" :
+    elif prog == "csta":
         status_log_file = "sta_status.log"
         match = re.match("pt_shell_dc_pass(\d+)\.log", log_file)
-        if match :
+        if match:
             status_log_file = "sta_status_dc_pass" + match.group(1) + ".log"
         match = re.match("pt_shell_icc_pass(\d+)\.log", log_file)
-        if match :
+        if match:
             status_log_file = "sta_status_icc_pass" + match.group(1) + ".log"
         match = re.match("pt_shell_eco_pass(\d+)\.log", log_file)
-        if match :
+        if match:
             status_log_file = "sta_status_eco_pass" + match.group(1) + ".log"
         return status_log_file
-    elif prog == "crvs" :
+    elif prog == "crvs":
         status_log_file = "rvs_status.log"
         match = re.match("fm_shell_dc_pass(\d+)\.log", log_file)
-        if match :
+        if match:
             status_log_file = "rvs_status_dc_pass" + match.group(1) + ".log"
         match = re.match("fm_shell_icc_pass(\d+)\.log", log_file)
-        if match :
+        if match:
             status_log_file = "rvs_status_icc_pass" + match.group(1) + ".log"
         match = re.match("fm_shell_eco_pass(\d+)\.log", log_file)
-        if match :
+        if match:
             status_log_file = "rvs_status_eco_pass" + match.group(1) + ".log"
         return status_log_file
-    elif prog == "cpar" :
+    elif prog == "cpar":
         status_log_file = "par_status.log"
-        if log_file == "eco_shell.log" :
+        if log_file == "eco_shell.log":
             status_log_file = "eco_status.log"
-        match = re.match("icc_shell_pass(\d+)\.log", log_file)
-        if match :
+        match = re.match("icc2_shell_pass(\d+)\.log", log_file)
+        if match:
             status_log_file = "par_status_pass" + match.group(1) + ".log"
         match = re.match("eco_shell_pass(\d+)\.log", log_file)
-        if match :
+        if match:
             status_log_file = "eco_status_pass" + match.group(1) + ".log"
         return status_log_file
-    elif prog == "cmerge_gds" :
+    elif prog == "cmerge_gds":
         status_log_file = "merge_gds_status.log"
         return status_log_file
-    elif prog == "cdrc" :
+    elif prog == "cdrc":
         status_log_file = "drc_status.log"
         return status_log_file
-    elif prog == "clvs" :
+    elif prog == "clvs":
         status_log_file = "lvs_status.log"
         return status_log_file
 
     raise Exception("PROGRAMMER ERROR")
 
-def parse_exceptions_file (excpt_file):
+
+def parse_exceptions_file(excpt_file):
     exceptions = []
     fp = open(excpt_file, "r")
     for line in fp:
-        if not line.isspace() and not re.search("^\s*\/\/", line) :
+        if not line.isspace() and not re.search("^\s*\/\/", line):
             exceptions.append(line)
     fp.close()
 
     return exceptions
 
-def main ():
+
+def main():
     args = parse_cmd_args()
 
     dv_root = os.environ.get("DV_ROOT")
-    if dv_root == None :
+    if dv_root == None:
         print args.prog + ": DV_ROOT environment variable not defined"
         sys.exit(1)
 
     # Find log files
     log_files = find_log_files(args.prog)
-    if len(log_files) == 0 :
+    if len(log_files) == 0:
         print args.prog + ": ERROR: Could not locate log file for checking."
         sys.exit(1)
 
     # Check the global exceptions file common to all progs
-    common_excpt_file = os.path.join(dv_root, "tools/synopsys/script/common/common.excpt")
-    if args.prog == "cdrc" or args.prog == "clvs" :
-        common_excpt_file = os.path.join(dv_root, "tools/calibre/script/common/common.excpt")
-    elif args.prog == "cmerge_gds" :
+    common_excpt_file = os.path.join(
+        dv_root, "asicflow/", args.process, "generic/common/synopsys/common.excpt")
+    if args.prog == "cdrc" or args.prog == "clvs":
+        common_excpt_file = os.path.join(
+            dv_root, "asicflow/", args.process, "generic/common/calibre/common.excpt")
+    elif args.prog == "cmerge_gds":
         # ICWBEV is weird, basically doesn't need exception file though
         common_excpt_file = None
-    if common_excpt_file and not os.path.isfile(common_excpt_file) :
+    if common_excpt_file and not os.path.isfile(common_excpt_file):
         print args.prog + ": ERROR: Could not find file '" + common_excpt_file + "'"
         sys.exit(1)
 
     # Check the global exceptions file exists
-    glbl_excpt_file = get_glbl_exceptions_file(args.prog, dv_root)
-    if not os.path.isfile(glbl_excpt_file) :
+    glbl_excpt_file = get_glbl_exceptions_file(args, dv_root)
+    if not os.path.isfile(glbl_excpt_file):
         print args.prog + ": ERROR: Could not find file '" + glbl_excpt_file + "'"
         sys.exit(1)
 
     # Check the local exceptions file exists
     local_excpt_file = get_local_exceptions_file(args.prog)
-    if not os.path.isfile(local_excpt_file) :
+    if not os.path.isfile(local_excpt_file):
         print args.prog + ": INFORMATION: Could not find file '" + local_excpt_file + "'...continuing"
 
     # We are pretty much good to go from here
@@ -312,7 +335,7 @@ def main ():
     exceptions = []
 
     # Load common exceptions list
-    if common_excpt_file :
+    if common_excpt_file:
         common_exceptions = parse_exceptions_file(common_excpt_file)
         exceptions.extend(common_exceptions)
 
@@ -321,34 +344,34 @@ def main ():
     exceptions.extend(glbl_exceptions)
 
     # Load local exceptions list
-    if os.path.isfile(local_excpt_file) :
+    if os.path.isfile(local_excpt_file):
         local_exceptions = parse_exceptions_file(local_excpt_file)
         exceptions.extend(local_exceptions)
 
     # Check each log file
     all_pass = True
-    for log_file in log_files :
+    for log_file in log_files:
         print args.prog + ": INFORMATION: Checking '" + log_file + "'..."
 
         # Grep log file for errors and warnings
         problems = []
         fp = open(log_file, "r")
-        for line in fp :
-            if re.search("error|warning", line, re.IGNORECASE) :
+        for line in fp:
+            if re.search("error|warning", line, re.IGNORECASE):
                 problems.append(line)
         fp.close()
 
         real_problems = []
 
         # Remove any exceptions from problems list
-        for problem in problems :
+        for problem in problems:
             is_exception = False
             if not len(exceptions) or re.search("|".join(exceptions), problem) is None:
                 real_problems.append(problem)
 
         # Check if there were any real problems
         status = "PASS"
-        if len(real_problems) > 0 :
+        if len(real_problems) > 0:
             status = "FAIL"
 
         # Check the last few lines of the log file are
@@ -356,32 +379,32 @@ def main ():
         # or anything
         fp = open(log_file, "r")
         lines = fp.readlines()
-        if len(lines) < 3 :
+        if len(lines) < 3:
             status = "UNFINISHED"
-        else :
+        else:
             last_few = lines[-3:]
             if not check_last_few_lines(args.prog, last_few):
                 status = "UNFINISHED"
         fp.close()
 
-        # Write out status file 
+        # Write out status file
         status_log_file = get_status_file(args.prog, log_file)
         fp = open(status_log_file, "w")
         fp.write("Status:\t\t" + status + "\n")
-        for problem in real_problems :
+        for problem in real_problems:
             fp.write(problem)
         fp.close()
 
-        if status ==  "PASS":
+        if status == "PASS":
             print args.prog + ": Status:\t\tPASS"
-        else :
+        else:
             print args.prog + ": Status:\t\t" + status + " (Check " + status_log_file + ")"
             all_pass = False
 
-    if all_pass :
+    if all_pass:
         sys.exit(0)
-    else :
+    else:
         sys.exit(1)
 
-if __name__ == "__main__" :
-    main ()
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,179 @@
+# Modified by Princeton University on April 3rd, 2016
+# ========== Copyright Header Begin ==========================================
+#
+# OpenSPARC T1 Processor File: rsyn,1.0
+# Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
+# DO NOT ALTER OR REMOVE COPYRIGHT NOTICES.
+#
+# The above named program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public
+# License version 2 as published by the Free Software Foundation.
+#
+# The above named program is distributed in the hope that it will be
+# useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public
+# License along with this work; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+# ========== Copyright Header End ============================================
+
+#######################################################################
+# Run RVS script
+#
+# rvs -help for help
+#######################################################################
+
+use warnings;
+use strict;
+use Cwd qw(chdir);
+use Getopt::Long;
+use rcommon;
+use File::Path qw(make_path);
+
+$| = 1;
+
+$SIG{__DIE__} = \&sighandler;
+
+#######################################################################
+# Global variables
+#######################################################################
+
+my $prg = $0;
+$prg =~ s/.*\///;
+$prg =~ s/,.*//;
+
+my $all      = 0;
+my $rvs_q    = "/bin/sh";
+my $slurm    = 0;
+my $scores   = "1";
+my $stime    = "12:00:00";
+my $swait    = 0;
+my $process  = "gf14_invecas";
+my $tool     = "fm";
+my $syn_tool = "dc";
+my $build_id = "";
+my $blk_dir  = "";
+
+my @blocks     = ();
+my @block_list = ();
+
+#######################################################################
+# Check command line options
+#######################################################################
+
+GetOptions(
+    'all'        => \$all,
+    'help|h'     => \&usage,
+    'slurm'      => \$slurm,
+    'scores=s'   => \$scores,
+    'stime=s'    => \$stime,
+    'swait'      => \$swait,
+    'process=s'  => \$process,
+    'tool=s'     => \$tool,
+    'build_id=s' => \$build_id,
+) or &usage;
+
+foreach my $argv (@ARGV) {
+    push @blocks, $argv;
+}
+
+my $blk_list       = "$ENV{DV_ROOT}/asicflow/$process/block.list";
+my $blocks_info    = process_blocks( $blk_list, $all, \@blocks );
+my $count          = $blocks_info->{COUNT};
+my $block_list_ref = $blocks_info->{MATCHES};
+@block_list = @$block_list_ref;
+
+if ($count) {
+    print "$prg: Running RVS for $count modules\n";
+}
+else {
+    print "$prg: No matching modules found.\n";
+    &usage;
+}
+if ( $build_id eq "" ) {
+    print "$prg: Please specify build_id\n";
+    &usage;
+}
+
+my @job_ids = ();
+foreach my $block (@block_list) {
+    print "$prg: Running RVS for $block->{ID}\n";
+    my $cmd = $rvs_q;
+    $blk_dir = $ENV{DV_ROOT};
+    $blk_dir
+        .= "/asicflow/$process/specific/$block->{PATH}/asicflow/rvs/$tool/rrvs_${build_id}";
+    if ( -e $blk_dir and -d $blk_dir ) {
+        print "$prg: Entering directory $blk_dir\n";
+    }
+    else {
+        my $syn_blk_dir
+            = "$ENV{DV_ROOT}/asicflow/$process/specific/$block->{PATH}/asicflow/syn/${syn_tool}/rsyn_${build_id}";
+        if ( -e $syn_blk_dir and -d $syn_blk_dir ) {
+            print "$prg: Creating directory $blk_dir\n";
+        }
+        else {
+            print "$prg: Please specify a valid build_id\n";
+            &usage;
+        }
+    }
+    make_path($blk_dir);
+    chdir $blk_dir;
+    `rm -rf fm_shell.log`;
+    die("DIE. Could not remove fm_shell.log file.") if ($?);
+    $cmd
+        .= " $ENV{DV_ROOT}/tools/bin/rvs_command_$tool $process $build_id $block->{PATH}";
+
+    if ( !$slurm ) {
+        system($cmd);
+    }
+    else {
+        my $block_fs = $block->{PATH};
+        my $find     = "/";
+        my $replace  = "_";
+        $block_fs =~ s/$find/$replace/g;
+        my $cmd_script = "rvs_";
+        $cmd_script .= $block->{ID};
+
+        create_slurm_script( $cmd_script, $cmd, $scores, $stime );
+
+        my $job_id = submit_slurm_job( $prg, $cmd_script );
+        push @job_ids, $job_id;
+    }
+}
+
+if ( $slurm && $swait ) {
+    print "$prg: Waiting for RVS jobs to finish...\n";
+    wait_slurm_jobs( \@job_ids );
+}
+
+#######################################################################
+sub usage {
+    printf "Usage: $prg [OPTION]... [block_list]...\n\n";
+    print "Run RTL vs Schematic for OpenPiton\n\n";
+    printf "Basic:\n";
+    printf "%-3s %-20s %s\n", "",    "--all",  "run RVS for all blocks.";
+    printf "%-3s %-20s %s\n", "-h,", "--help", "print this help.";
+    printf "%-3s %-20s %s\n", "",    "--slurm",
+        "run with SLURM. see SLURM options.";
+    printf "%-3s %-20s %s\n", "", "--process=STRING",
+        "set the process node. (default=gf14_invecas)";
+    printf "%-3s %-20s %s\n", "", "--tool=STRING",
+        "set the tool used for synthesis. (default=dc)";
+    printf "%-3s %-20s %s\n\n", "", "--build_id=STRING", "set the build ID. ";
+    printf "SLURM:\n";
+    printf "%-3s %-20s %s\n", "", "--scores=NUMBER",
+        "number of cores to request. (default=6)";
+    printf "%-3s %-20s %s\n", "", "--stime=TIME",
+        "amount of time to request. (default=12:00:00)";
+    printf "%-3s %-20s %s\n\n", "", "--swait",
+        "wait for synthesis jobs to finish before returning.";
+    printf "%-24s %s\n\n", "block_list:",
+        "specify list of blocks to synthesize.";
+    printf "Examples:\n";
+    print "\t$prg -all\n\t$prg fpu_add\n\n";
+    exit(0);
+}
+#######################################################################
