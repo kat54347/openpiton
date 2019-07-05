@@ -35,6 +35,13 @@ if {$ASIC_PROCESS eq "asap7"} {
 
     # mapping flip-flops to ASAP7 library
     yosys dfflibmap -liberty "${ASAP7_IP}/asap7libs_24/lib/asap7sc7p5t_24_SEQ_RVT_TT.lib"
+} elseif {$ASIC_PROCESS eq "nan45"} {
+    set NAN45_IP $::env(NAN45_IP)
+    # mapping logic to NAN45 library
+    yosys abc -dff -liberty "${NAN45_IP}/Front_End/Liberty/NLDM/NangateOpenCellLibrary_typical.lib" -D 200
+
+    # mapping flip-flops to NAN45 library
+    yosys dfflibmap -liberty "${NAN45_IP}/Front_End/Liberty/NLDM/NangateOpenCellLibrary_typical.lib"
 }
 
 set RESULTS_DIR "results"
