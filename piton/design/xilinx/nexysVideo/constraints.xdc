@@ -35,6 +35,7 @@ set_property PACKAGE_PIN G4 [get_ports sys_rst_n]
 set_false_path -to [get_cells -hierarchical *afifo_ui_rst_r*]
 set_false_path -to [get_cells -hierarchical *ui_clk_sync_rst_r*]
 set_false_path -to [get_cells -hierarchical *ui_clk_syn_rst_delayed*]
+set_false_path -to [get_cells -hierarchical *chipset_rst_n*]
 set_false_path -to [get_cells -hierarchical *init_calib_complete_f*]
 set_false_path -from [get_clocks chipset_clk_clk_mmcm] -to [get_clocks net_axi_clk_clk_mmcm]
 set_false_path -from [get_clocks net_axi_clk_clk_mmcm] -to [get_clocks chipset_clk_clk_mmcm]
@@ -66,22 +67,14 @@ set_property IOSTANDARD LVCMOS12 [get_ports {sw[7]}]
 set_property PACKAGE_PIN M17 [get_ports {sw[7]}]
 
 # SD
-set_property IOSTANDARD LVCMOS33 [get_ports sd_clk_out]
-set_property PACKAGE_PIN W19 [get_ports sd_clk_out]
-set_property IOSTANDARD LVCMOS33 [get_ports sd_cd]
-set_property PACKAGE_PIN T18 [get_ports sd_cd]
-set_property IOSTANDARD LVCMOS33 [get_ports sd_cmd]
-set_property PACKAGE_PIN W20 [get_ports sd_cmd]
-set_property IOSTANDARD LVCMOS33 [get_ports sd_dat[0]]
-set_property PACKAGE_PIN V19 [get_ports sd_dat[0]]
-set_property IOSTANDARD LVCMOS33 [get_ports sd_dat[1]]
-set_property PACKAGE_PIN T21 [get_ports sd_dat[1]]
-set_property IOSTANDARD LVCMOS33 [get_ports sd_dat[2]]
-set_property PACKAGE_PIN T20 [get_ports sd_dat[2]]
-set_property IOSTANDARD LVCMOS33 [get_ports sd_dat[3]]
-set_property PACKAGE_PIN U18 [get_ports sd_dat[3]]
-set_property IOSTANDARD LVCMOS33 [get_ports sd_reset]
-set_property PACKAGE_PIN V20 [get_ports sd_reset]
+set_property -dict {IOSTANDARD LVCMOS33 PACKAGE_PIN W19 DRIVE 16 SLEW FAST} [get_ports sd_clk_out]
+set_property -dict {IOSTANDARD LVCMOS33 PACKAGE_PIN W20} [get_ports sd_cmd]
+set_property -dict {IOSTANDARD LVCMOS33 PACKAGE_PIN V19} [get_ports {sd_dat[0]}]
+set_property -dict {IOSTANDARD LVCMOS33 PACKAGE_PIN T21} [get_ports {sd_dat[1]}]
+set_property -dict {IOSTANDARD LVCMOS33 PACKAGE_PIN T20} [get_ports {sd_dat[2]}]
+set_property -dict {IOSTANDARD LVCMOS33 PACKAGE_PIN U18} [get_ports {sd_dat[3]}]
+set_property -dict {IOSTANDARD LVCMOS33 PACKAGE_PIN V20} [get_ports sd_reset]
+set_property -dict {IOSTANDARD LVCMOS33 PACKAGE_PIN T18} [get_ports sd_cd]
 
 ## LEDs
 
@@ -173,30 +166,60 @@ set_input_delay -clock [get_clocks net_phy_rxc_virt] -max -add_delay 4.000 [get_
 create_generated_clock -name net_phy_txc -source [get_pins chipset/net_phy_txc_oddr/C] -divide_by 1 -invert [get_ports net_phy_txc]
 
 #############################################
-# SD Card Constraints for 25 Mb/s
+# SD Card Constraints for 25MHz
 #############################################
 create_generated_clock -name sd_fast_clk -source [get_pins chipset/clk_mmcm/sd_sys_clk] -divide_by 2 [get_pins chipset/chipset_impl/piton_sd_top/sdc_controller/clock_divider0/fast_clk_reg/Q]
 create_generated_clock -name sd_slow_clk -source [get_pins chipset/clk_mmcm/sd_sys_clk] -divide_by 200 [get_pins chipset/chipset_impl/piton_sd_top/sdc_controller/clock_divider0/slow_clk_reg/Q]
-create_generated_clock -name sd_clk_out -source [get_pins chipset/sd_clk_oddr/C] -divide_by 1 -add -master_clock sd_fast_clk [get_ports sd_clk_out]
+create_generated_clock -name sd_clk_out   -source [get_pins chipset/sd_clk_oddr/C] -divide_by 1 -add -master_clock sd_fast_clk [get_ports sd_clk_out]
 create_generated_clock -name sd_clk_out_1 -source [get_pins chipset/sd_clk_oddr/C] -divide_by 1 -add -master_clock sd_slow_clk [get_ports sd_clk_out]
-create_clock -period 40.000 -name VIRTUAL_sd_fast_clk -waveform {0.000 20.000}
-create_clock -period 4000.000 -name VIRTUAL_sd_slow_clk -waveform {0.000 2000.000}
-set_output_delay -clock [get_clocks sd_clk_out] -min -add_delay 5.000 [get_ports {sd_dat[*]}]
-set_output_delay -clock [get_clocks sd_clk_out] -max -add_delay 15.000 [get_ports {sd_dat[*]}]
-set_output_delay -clock [get_clocks sd_clk_out_1] -min -add_delay 5.000 [get_ports {sd_dat[*]}]
-set_output_delay -clock [get_clocks sd_clk_out_1] -max -add_delay 1500.000 [get_ports {sd_dat[*]}]
-set_output_delay -clock [get_clocks sd_clk_out] -min -add_delay 5.000 [get_ports sd_cmd]
-set_output_delay -clock [get_clocks sd_clk_out] -max -add_delay 15.000 [get_ports sd_cmd]
-set_output_delay -clock [get_clocks sd_clk_out_1] -min -add_delay 5.000 [get_ports sd_cmd]
-set_output_delay -clock [get_clocks sd_clk_out_1] -max -add_delay 1500.000 [get_ports sd_cmd]
-set_input_delay -clock [get_clocks VIRTUAL_sd_fast_clk] -min -add_delay 20.000 [get_ports {sd_dat[*]}]
-set_input_delay -clock [get_clocks VIRTUAL_sd_fast_clk] -max -add_delay 35.000 [get_ports {sd_dat[*]}]
-set_input_delay -clock [get_clocks VIRTUAL_sd_slow_clk] -min -add_delay 2000.000 [get_ports {sd_dat[*]}]
-set_input_delay -clock [get_clocks VIRTUAL_sd_slow_clk] -max -add_delay 3500.000 [get_ports {sd_dat[*]}]
-set_input_delay -clock [get_clocks VIRTUAL_sd_fast_clk] -min -add_delay 20.000 [get_ports sd_cmd]
-set_input_delay -clock [get_clocks VIRTUAL_sd_fast_clk] -max -add_delay 35.000 [get_ports sd_cmd]
-set_input_delay -clock [get_clocks VIRTUAL_sd_slow_clk] -min -add_delay 2000.000 [get_ports sd_cmd]
-set_input_delay -clock [get_clocks VIRTUAL_sd_slow_clk] -max -add_delay 3500.000 [get_ports sd_cmd]
+
+# compensate for board trace uncertainty
+set_clock_uncertainty 0.500 [get_clocks sd_clk_out]
+set_clock_uncertainty 0.500 [get_clocks sd_clk_out_1]
+
+#################
+# FPGA out / card in
+# data is aligned with clock (source synchronous)
+
+# hold fast (spec requires minimum 2ns), note that data is launched on falling edge, so 0.0 is ok here
+set_output_delay -clock [get_clocks sd_clk_out] -min -add_delay -6.000 [get_ports {sd_dat[*]}]
+set_output_delay -clock [get_clocks sd_clk_out] -min -add_delay -6.000 [get_ports sd_cmd]
+
+# setup fast (spec requires minimum 6ns)
+set_output_delay -clock [get_clocks sd_clk_out] -max -add_delay 8.000 [get_ports {sd_dat[*]}]
+set_output_delay -clock [get_clocks sd_clk_out] -max -add_delay 8.000 [get_ports sd_cmd]
+
+# hold slow (spec requires minimum 5ns), note that data is launched on falling edge, so 0.0 is ok here
+set_output_delay -clock [get_clocks sd_clk_out_1] -min -add_delay -8.000 [get_ports {sd_dat[*]}]
+set_output_delay -clock [get_clocks sd_clk_out_1] -min -add_delay -8.000 [get_ports sd_cmd]
+
+# setup slow (spec requires minimum 5ns)
+set_output_delay -clock [get_clocks sd_clk_out_1] -max -add_delay 8.000 [get_ports {sd_dat[*]}]
+set_output_delay -clock [get_clocks sd_clk_out_1] -max -add_delay 8.000 [get_ports sd_cmd]
+
+#################
+# card out / FPGA in
+# data is launched on negative clock edge here
+
+# propdelay fast
+set_input_delay -clock [get_clocks sd_clk_out] -clock_fall -max -add_delay 14.000 [get_ports {sd_dat[*]}]
+set_input_delay -clock [get_clocks sd_clk_out] -clock_fall -max -add_delay 14.000 [get_ports sd_cmd]
+
+# contamination delay fast
+set_input_delay -clock [get_clocks sd_clk_out] -clock_fall -min -add_delay -14.000 [get_ports {sd_dat[*]}]
+set_input_delay -clock [get_clocks sd_clk_out] -clock_fall -min -add_delay -14.000 [get_ports sd_cmd]
+
+# propdelay slow
+set_input_delay -clock [get_clocks sd_clk_out_1] -clock_fall -max -add_delay 14.000 [get_ports {sd_dat[*]}]
+set_input_delay -clock [get_clocks sd_clk_out_1] -clock_fall -max -add_delay 14.000 [get_ports sd_cmd]
+
+# contamination  slow
+set_input_delay -clock [get_clocks sd_clk_out_1] -clock_fall -min -add_delay -14.000 [get_ports {sd_dat[*]}]
+set_input_delay -clock [get_clocks sd_clk_out_1] -clock_fall -min -add_delay -14.000 [get_ports sd_cmd]
+
+#################
+# clock groups
+
 set_clock_groups -physically_exclusive -group [get_clocks -include_generated_clocks sd_clk_out] -group [get_clocks -include_generated_clocks sd_clk_out_1]
-set_clock_groups -logically_exclusive -group [get_clocks -include_generated_clocks {VIRTUAL_sd_fast_clk sd_fast_clk}] -group [get_clocks -include_generated_clocks {sd_slow_clk VIRTUAL_sd_slow_clk}]
-set_clock_groups -asynchronous -group [get_clocks [list [get_clocks -of_objects [get_pins chipset/clk_mmcm/inst/mmcm_adv_inst/CLKOUT0]]]] -group [get_clocks -filter { NAME =~  "*sd*" }]
+set_clock_groups -logically_exclusive -group [get_clocks -include_generated_clocks sd_fast_clk] -group [get_clocks -include_generated_clocks sd_slow_clk]
+set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks chipset_clk_clk_mmcm] -group [get_clocks -filter { NAME =~  "*sd*" }]

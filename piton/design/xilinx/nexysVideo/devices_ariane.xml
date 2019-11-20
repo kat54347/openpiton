@@ -22,8 +22,8 @@ Description: Peripheral address map for OpenPiton+Ariane configurations.
     <port>
         <name>mem</name>
         <base>0x80000000</base>
-        <!-- 1 GB -->
-        <length>0x40000000</length>
+        <!-- 256MB -->
+        <length>0x10000000</length>
     </port>
     <port>
         <name>iob</name>
@@ -43,6 +43,7 @@ Description: Peripheral address map for OpenPiton+Ariane configurations.
         <!-- Just give it all the space up to the network device? -->
         <length>0xd4000</length>
         <noc2in/>
+        <stream_accessible/>
     </port>
     <port>
         <name>net</name>
@@ -55,24 +56,28 @@ Description: Peripheral address map for OpenPiton+Ariane configurations.
         <name>ariane_debug</name>
         <base>0xfff1000000</base>
         <length>0x1000</length>
+        <stream_accessible/>
     </port>
     <port>
         <!-- this is the shared bootrom (contains DTB that is generated for the current platform config) -->
         <name>ariane_bootrom</name>
         <base>0xfff1010000</base>
         <length>0x10000</length>
+        <stream_accessible/>
     </port>
     <port>
         <!-- core local interrupt controller with real-time counter. this is shared among all cores -->
         <name>ariane_clint</name>
         <base>0xfff1020000</base>
-        <length>0x10000</length>
+        <length>0xc0000</length>
+        <stream_accessible/>
     </port>
     <!-- platform level interrupt controller -->
     <port>
         <name>ariane_plic</name>
-        <base>0xfff1030000</base>
-        <length>0x10000</length>
+        <base>0xfff1100000</base>
+        <length>0x4000000</length>
+        <stream_accessible/>
     </port>
     <!-- end ariane specific periphs -->
 </devices>

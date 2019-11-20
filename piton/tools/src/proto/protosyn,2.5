@@ -59,8 +59,11 @@ def usage():
     print >> sys.stderr, "       -b, --board  <board_type>"
     print >> sys.stderr, "              Name of a supported Xilinx's development board. Available options are:"
     print >> sys.stderr, "                  vc707"
+    print >> sys.stderr, "                  vcu118"
+    print >> sys.stderr, "                  xupp3r"
     print >> sys.stderr, "                  genesys2"
     print >> sys.stderr, "                  nexysVideo"
+    print >> sys.stderr, "                  f1"
     print >> sys.stderr, "\n       -d, --design <design>"
     print >> sys.stderr, "              Name of design module to synthesize.  The default is 'system', which"
     print >> sys.stderr, "              synthesizes a full system with chip and chipset. See"
@@ -100,6 +103,9 @@ def usage():
     print >> sys.stderr, "\n       --uart-dmw <storage type>"
     print >> sys.stderr, "              Implement design with Direct Memory Write (DMW) from UART module turned on."
     print >> sys.stderr, "              Storage type: \"ddr\""
+    print >> sys.stderr, "\n       --uart-reset"
+    print >> sys.stderr, "              Attach UART traffic sniffer to the uart port. This sniffer will send"
+    print >> sys.stderr, "              the reset signal to the whole system if it sees magic sequence 0x9a337213af278f34"
     print >> sys.stderr, "\n       --asic-rtl"
     print >> sys.stderr, "              Implement design with ASIC RTL."
     print >> sys.stderr, "\n       --chip-bridge"
@@ -131,6 +137,8 @@ def usage():
     print >> sys.stderr, "              Run steps of flow using SLURM job scheduler"
     print >> sys.stderr, "\n       --swait"
     print >> sys.stderr, "\n            Wait for slurm jobs to finish"
+    print >> sys.stderr, "\n       -j, --jobs"
+    print >> sys.stderr, "              Number of jobs to use in Vivado implementation flow"
     print >> sys.stderr, "\n       -h, --help"
     print >> sys.stderr, "              Display this help message and exit"
     print >> sys.stderr, "\n"
@@ -194,6 +202,20 @@ def run_vivado(log, script, design_dir, board, slurm, tpn, mem_mb, time_str, jna
         flog.close()
         return None
 
+def run_f1_script(log, design_dir, board, slurm, tpn, mem_mb, time_str, jname, dep_list):
+    # Variables passed to TCL scripts
+    os.environ['PROTOSYN_RUNTIME_DESIGN_PATH'] = design_dir
+    os.environ['PROTOSYN_RUNTIME_BOARD'] = board
+
+    cmd = [os.environ['CL_DIR']+"/build/scripts/aws_build_dcp_from_cl.sh", "-notify", "-clock_recipe_a", "A0", "-clock_recipe_b", "B1", "-clock_recipe_c", "C2"]
+    if slurm:
+        return slurm_launch(cmd, log, tpn, mem_mb, time_str, jname, dep_list)
+    else:
+        flog = open(log, "w")
+        subprocess.call(cmd, stdout=flog)
+        flog.close()
+        return None
+
 def run_ise(log, script, design_dir, board, slurm, tpn, mem_mb, time_str, jname, dep_list):
     # Variables passed to TCL scripts
     os.environ['PROTOSYN_RUNTIME_DESIGN_PATH'] = design_dir
@@ -207,6 +229,49 @@ def run_ise(log, script, design_dir, board, slurm, tpn, mem_mb, time_str, jname,
         subprocess.call(cmd, stdout=flog, stderr=flog)
         flog.close()
         return None
+
+def runImplF1(board, design_data, src_dir, work_dir, log_dir, def_list, slurm, dep_list):
+    prev_dir = os.getcwd()
+
+    # Copy all sources in ppp/build/... , and set new CL_DIR
+    os.system("rsync -raz --copy-links " + os.path.join(src_dir, "build") + " " + work_dir)
+    if not os.path.exists(os.path.join(work_dir, "design", "xilinx")):
+        os.makedirs(os.path.join(work_dir, "design", "xilinx"))
+    os.system("rsync -raz --copy-links " + os.path.join(src_dir, "design", "cl_id_defines.vh") + " " + os.path.join(work_dir, "design"))
+    os.system("rsync -raz --copy-links " + os.path.join(DV_ROOT, "design", "xilinx", "f1") + " " + os.path.join(work_dir, "design", "xilinx"))
+    os.system("rsync -raz --copy-links " + os.path.join(DV_ROOT, "design", "xilinx", "design.tcl") + " " + os.path.join(work_dir, "design", "xilinx", "design.tcl"))
+    os.environ["ORIGINAL_CL_DIR"] = os.environ["CL_DIR"]
+    os.environ["CL_DIR"] = work_dir
+
+    #hack to fight with aws scripts assuming we have SH_DDR in top module
+    #aws_constraints_inpath = os.path.join(os.environ["HDK_SHELL_DIR"], "build", "constraints", "cl_synth_aws.xdc")
+    #aws_constraints_outpath = os.path.join(os.environ["CL_DIR"], "build", "constraints", "cl_synth_aws.xdc")
+    #os.system("sed 's/SH_DDR/sh_ddr/g' " + aws_constraints_inpath + " > " + aws_constraints_outpath)
+    
+    # Ok, lets go build staff finally
+    os.chdir(os.path.join(work_dir, "build", "scripts"))
+
+    # Generate additional defines file that will be sourced in tcl script
+    f = open("additional_defines.tcl", "w")
+    print >> f, "set PROTOSYN_RUNTIME_DEFINES \"%s\"" % ' '.join(def_list)
+    f.close()
+
+    tool = find_board_tool(board)
+
+    #dname = board + "_piton"
+    #os.chdir(dname)
+    print_info("Generating DCP for AWS F1 in nohup")
+    design_board_dir = os.path.join(design_data["PATH"], board)
+    impl_log = os.path.join(log_dir, PROJECT_IMPL_LOG)
+    jname = "protosyn_impl_%s_%s" % (board, design_data["ID"])
+    jid = run_f1_script(impl_log, design_data["PATH"], board, \
+                     slurm, 8, 64000, "6:00:00", jname, dep_list)
+    print_info("Log available at %s" % os.path.join(os.getcwd(), "last_log"))
+
+    os.chdir(prev_dir)
+
+    return jid
+
 
 def makeProject(board, design_data, work_dir, log_dir, slurm, dep_list):
     prev_dir = os.getcwd()
@@ -307,7 +372,10 @@ def checkCmdOptions(options):
         sys.exit(2)
 
     # Check if design module is found
-    design_data = find_design_block(options.design)
+    if options.board == "f1":
+        design_data = find_design_block("piton_aws")
+    else:
+        design_data = find_design_block(options.design)
     if (design_data == None):
         print_error("Could not find design module '" + options.design + "'")
         usage()
@@ -393,6 +461,7 @@ def setParserOptions(parser):
     parser.add_option("--no-ddr", dest="no_ddr", action="store_true", default=False)
     parser.add_option("--eth", dest="eth", action="store_true", default=False)
     parser.add_option("--uart-dmw", dest="uart_dmw", action="store", default=None)
+    parser.add_option("--uart-reset", dest="uart_reset", action="store_true", default=False)
     parser.add_option("--asic-rtl", dest="asic_rtl", action="store_true", default=False)
     parser.add_option("--chip-bridge", dest="chip_bridge", action="store_true", default=False)
     parser.add_option("--inc-passthru", dest="inc_passthru", action="store_true", default=False)
@@ -400,11 +469,14 @@ def setParserOptions(parser):
     parser.add_option("--passthru-dec-uart-pkttrace", dest="passthru_dec_uart_pkttrace", action="store_true", default=False)
     parser.add_option("--define", dest="define", action="store", default=None)
     parser.add_option("--oled", dest="oled", action="store")
+    parser.add_option("-j", "--jobs", dest="jobs", action="store", default=1)
     parser.add_option("-h", "--help", dest="help", action="store_true", default=False)
     parser.add_option("--gen-test-bram", dest="gen_test_bram", action="store_true", default=False)  # depricated ?
     parser.add_option("--make-mem-map", dest="make_mem_map", action="store_true", default=False)
     parser.add_option("--slurm", dest="slurm", action="store_true", default=False)
     parser.add_option("--swait", dest="swait", action="store_true", default=False)
+    parser.add_option("--axi4_mem", dest="axi4_mem", action="store_true", default=False)
+    parser.add_option("--zeroer_off", dest="zeroer_off", action="store_true", default=False)
 
     return parser
 
@@ -414,14 +486,32 @@ def makeDefList(options):
     #df = options.board.upper() + "_BOARD"
     #defines.append(df)
 
+    # disable CSM in this case
+    if options.core == 'ariane':
+        defines.append("NO_RTL_CSM")
+
+    if (options.board == "f1"):
+        print_info("design option is ignored for f1")
+
     # --no-ddr option
     if (options.no_ddr == True) or (options.board == "piton_board"):
         defines.append("PITONSYS_NO_MC")
     else:   # default option
         defines.append("PITON_FPGA_MC_DDR3")
 
-    # do not use SD controller if BRAM is used for boot or a test
-    if (options.test_name != None) or (options.board == "piton_board"):
+    # --axi4_mem option
+    if (options.axi4_mem == True):
+        if (options.board not in {"vc707", "xupp3r"}):
+            print_warning("axi4_mem option is ignored without board != vc707 or board != xupp3r" )
+        else:
+            defines.append("PITONSYS_AXI4_MEM")      
+        
+    # --zeroer_off option
+    if (options.zeroer_off == False):
+        defines.append("PITONSYS_MEM_ZEROER")    
+
+    # do not use SD controller if BRAM is used for boot or a test or if board doesn't have sd
+    if (options.test_name != None) or (options.board in {"piton_board", 'xupp3r', "f1"}):
         pass
     else:   # default option
         defines.append("PITON_FPGA_SD_BOOT")
@@ -437,6 +527,9 @@ def makeDefList(options):
     elif options.uart_dmw == "bram":
         defines.append("PITONSYS_UART_BOOT")
         defines.append("PITON_FPGA_BRAM_TEST")
+
+    if options.uart_reset == True:
+        defines.append("PITONSYS_UART_RESET")
 
     # --asic-rtl option
     if options.asic_rtl == True:
@@ -485,7 +578,7 @@ def makeDefList(options):
 
     # --eth CL options is default for chipset
     if options.eth or options.design == "chipset" or options.design == "system":
-        # Ethernet controller is supported on Genesys2 and nexysVideo only
+        # Ethernet controller is supported on Genesys2 and nexysVideo
         if options.board == "genesys2" or options.board == "nexysVideo":
             defines.append("PITON_FPGA_ETHERNETLITE")
         else:
@@ -567,6 +660,7 @@ def main():
     run_make_project        = True
     run_fpga_impl           = True
     run_gen_test_bram       = False
+    run_f1_impl             = False
 
     if options.test_name != None:
         run_sim             = True
@@ -588,6 +682,13 @@ def main():
         run_make_project    = False
         run_fpga_impl       = False
 
+    if options.board == "f1":
+        run_f1_impl             = True
+        run_make_project        = False
+        run_fpga_impl           = False
+        run_sim                 = False # maybe change later
+        run_map_test            = False # maybe change later
+
     ##################################
     # Setting directory structure
     ##################################
@@ -598,8 +699,7 @@ def main():
     ##################################
     # Set environment vars for pyhp
     ##################################
-
-    print_info("---- RTL configuration ----")
+    print_info("----- System Configuration -----")
 
     # tile config
     if (int(options.x_tiles)*int(options.y_tiles)) > 1:
@@ -643,25 +743,25 @@ def main():
         for i in range(int(options.num_tiles)):
             if i %2:
                 os.environ['RTL_PICO' + str(i)] = "1"
-                print_info('defining RTL_PICO' + str(i))
+                print_info('setenv RTL_PICO' + str(i))
 
             else:
                 os.environ['RTL_SPARC' + str(i)] = "1"
-                print_info('defining RTL_SPARC' + str(i))
+                print_info('setenv RTL_SPARC' + str(i))
 
     elif options.core == 'ariane':
         os.environ['PITON_ARIANE'] = "1"
-        os.environ['L2_CAM_MSHR']  = "1"
+        os.environ['WT_DCACHE']    = "1"
 
         for i in range(int(options.num_tiles)):
             os.environ['RTL_ARIANE' + str(i)] = "1"
-            print_info('defining RTL_ARIANE' + str(i))
+            print_info('setenv RTL_ARIANE' + str(i))
 
     elif options.core == 'sparc':
         # this is the default
         for i in range(int(options.num_tiles)):
             os.environ['RTL_SPARC' + str(i)] = "1"
-            print_info('defining RTL_SPARC' + str(i))
+            print_info('setenv RTL_SPARC' + str(i))
 
     else:
         print_error("invalid core configuration " + str(options.core))
@@ -694,7 +794,15 @@ def main():
     os.environ['CONFIG_L2_SIZE']           = str(options.config_l2_size)
     os.environ['CONFIG_L2_ASSOCIATIVITY']  = str(options.config_l2_associativity)
 
-    print_info("---------------------------")
+    # this is needed to generate the device tree
+    os.environ['CONFIG_SYS_FREQ']          = str(int(float(design_data["BOARDS"][options.board]["FREQ"]) * 1e6))
+
+    print_info("---- Additional RTL Defines ----")
+
+    for d in defines:
+        print_info(d)
+
+    print_info("--------------------------------")
 
     ##################################
     # Get a trace
@@ -706,35 +814,35 @@ def main():
         config = ' -x_tiles=' + str(options.x_tiles)                         + \
                  ' -y_tiles=' + str(options.y_tiles)                         + \
                  ' -network_config=' + str(options.network_config)           + \
-                 ' -config_l1i_size=' + str(options.network_config)          + \
-                 ' -config_l1d_size=' + str(options.network_config)          + \
-                 ' -config_l15_size=' + str(options.network_config)          + \
-                 ' -config_l2_size='  + str(options.network_config)          + \
-                 ' -config_l1i_associativity=' + str(options.network_config) + \
-                 ' -config_l1d_associativity=' + str(options.network_config) + \
-                 ' -config_l15_associativity=' + str(options.network_config) + \
-                 ' -config_l2_associativity='  + str(options.network_config)
+                 ' -config_l1i_size=' + str(options.config_l1i_size)          + \
+                 ' -config_l1d_size=' + str(options.config_l1d_size)          + \
+                 ' -config_l15_size=' + str(options.config_l1i_size)          + \
+                 ' -config_l2_size='  + str(options.config_l2_size)          + \
+                 ' -config_l1i_associativity=' + str(options.config_l1i_associativity) + \
+                 ' -config_l1d_associativity=' + str(options.config_l1d_associativity) + \
+                 ' -config_l15_associativity=' + str(options.config_l15_associativity) + \
+                 ' -config_l2_associativity='  + str(options.config_l2_associativity)
 
         if options.core == 'pico':
-            config + ' -pico'
+            config += ' -pico'
 
         if options.core == 'pico_het':
-            config + ' -pico -pico_het'
+            config += ' -pico -pico_het'
 
         if options.core == 'ariane':
-            config + ' -ariane'
+            config += ' -ariane'
 
         print_info("Synthesizing a test: %s" % options.test_name)
         print_info("Compilation started")
         ret_val = os.system('sims -sys=manycore' + config + ' -vcs_build -vcs_build_args=+libext+.v -vcs_build_args=-Mupdate > %s/compilation.log' % rc_dir.log)
         if ret_val != 0:
             print_error("Compilation didn't finish successfully!")
-            print_info("See for Errors in %scompilation.log" % rc_dir.log)
+            print_info("See for Errors in %s/compilation.log" % rc_dir.log)
             sys.exit(1)
         print_info("Simulation started")
         print_info("Using core clock frequency: %s MHz" % design_data["BOARDS"][options.board]["FREQ"])
         div = calcUARTLatch(design_data, options.board)
-        os.system('sims -sys=manycore ' + config + '-vcs_run -midas_args=-DUART_DIV_LATCH=0x%x %s > %s/simulation.log' % (div, options.test_name, rc_dir.log))
+        os.system('sims -sys=manycore ' + config + ' -vcs_run -midas_args=-DUART_DIV_LATCH=0x%x %s > %s/simulation.log' % (div, options.test_name, rc_dir.log))
 
         f = open('%s/simulation.log' % rc_dir.log, 'r')
         cont = f.read()
@@ -786,7 +894,17 @@ def main():
 
     # FPGA implementation
     if run_fpga_impl:
+        if int(options.jobs)>1:
+            print_info("Using %d jobs in Vivado" % int(options.jobs))
+        os.environ['NUM_VIVADO_JOBS']   = str(int(options.jobs))
         jid = runImplFlow(options.board, design_data, rc_dir.work, rc_dir.log, defines, options.slurm, dep_list)
+        if jid != None:
+            dep_list.append(jid)
+
+    # f1
+    if run_f1_impl:
+        src = os.path.join(os.environ["HDK_DIR"], "cl", "developer_designs", "piton_aws")
+        jid = runImplF1(options.board, design_data, src, rc_dir.work, rc_dir.log, defines, options.slurm, dep_list)
         if jid != None:
             dep_list.append(jid)
 

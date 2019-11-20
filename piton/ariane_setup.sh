@@ -36,7 +36,9 @@
 #          libusb-1.0-0-dev \
 #          default-jdk \
 #          zlib1g-dev \
-#          valgrind
+#          valgrind \
+#          csh
+
 
 echo
 echo "----------------------------------------------------------------------"
@@ -73,13 +75,14 @@ export PITON_ROOT=`pwd`
 export CXX=g++-7 CC=gcc-7
 # customize this to a fast local disk
 export RISCV=/scratch/$USER/riscv_install
+export VERILATOR_ROOT=$TOP/verilator-4.014/
 
 # setup paths
-export PATH=$PATH:${RISCV}/bin
+export PATH=$RISCV/bin:$VERILATOR_ROOT/bin:$PATH
 export LIBRARY_PATH=$RISCV/lib
 export LD_LIBRARY_PATH=$RISCV/lib
-export C_INCLUDE_PATH=$RISCV/include
-export CPLUS_INCLUDE_PATH=$RISCV/include
+export C_INCLUDE_PATH=$RISCV/include:$VERILATOR_ROOT/include
+export CPLUS_INCLUDE_PATH=$RISCV/include:$VERILATOR_ROOT/include
 export ARIANE_ROOT=${PITON_ROOT}/piton/design/chip/tile/ariane/
 
 # source OpenPiton setup script
@@ -90,8 +93,8 @@ if [[ $(readlink -e "${RISCV}/bin/spike") == "" ]]
 then
     echo
     echo "----------------------------------------------------------------------"
-    echo "setup complete. do not forget to run the ariane_build_tools.sh script"
-    echo "if you run this for the first time."
+    echo "setup complete. do not forget to run the following script             "
+    echo "if you run the setup for the first time: ./piton/ariane_build_tools.sh"
     echo "----------------------------------------------------------------------"
     echo
 else

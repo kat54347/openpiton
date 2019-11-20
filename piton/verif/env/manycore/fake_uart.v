@@ -47,12 +47,13 @@ wire                        m_axi_wvalid;
 integer file;
 
 initial begin
-    file = $fopen("fake_uart.log");
+    file = $fopen("fake_uart.log", "w");
 end
 
 always @(posedge clk) begin
     if (m_axi_awvalid & m_axi_wvalid & (m_axi_awaddr[2:0] == 3'b0)) begin
-        $fwrite(file, "%c", m_axi_wdata);
+        $fwrite(file, "%c", m_axi_wdata[7:0]);
+        $fflush(file);
     end
 end
 
@@ -96,7 +97,10 @@ noc_axilite_bridge #(
     //write response channel
     .m_axi_bresp            (2'b0),
     .m_axi_bvalid           (1'b1),
-    .m_axi_bready           ()
+    .m_axi_bready           (),
+    // non-axi-lite signals
+    .w_reqbuf_size          (),
+    .r_reqbuf_size          ()
 );
 
 

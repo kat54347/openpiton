@@ -1,6 +1,6 @@
 # Copyright (c) 2016 Princeton University
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #     * Redistributions of source code must retain the above copyright
@@ -11,7 +11,7 @@
 #     * Neither the name of Princeton University nor the
 #       names of its contributors may be used to endorse or promote products
 #       derived from this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY PRINCETON UNIVERSITY "AS IS" AND
 # ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 # WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -45,6 +45,10 @@ open_project ${VIVADO_PROJECT_FILE}
 set_property verilog_define ${ALL_VERILOG_MACROS} [get_fileset sources_1]
 set_property verilog_define ${ALL_VERILOG_MACROS} [get_fileset sim_1]
 
+# Some additional effort to meet timing
+set_property flow {Vivado Implementation 2016} [get_runs impl_1]
+set_property strategy Performance_ExtraTimingOpt [get_runs impl_1]
+
 # Dealing with Vivado case, when it locks IPs as old ones
 upgrade_ip [get_ips -all]
 
@@ -54,7 +58,7 @@ close_project
 open_project ${VIVADO_PROJECT_FILE}
 
 # Launch implementation
-launch_run impl_1 -to_step write_bitstream
+launch_run impl_1 -to_step write_bitstream -jobs $::env(NUM_VIVADO_JOBS)
 puts "INFO: Implementation launched for project '${PROJECT_NAME}'"
 
 # Wait for run to finish

@@ -205,6 +205,7 @@ Getopt::Long::Configure ('no_auto_abbrev') ;
         'sys' => "",
         'tg_seed' => -1,
         'tmp_dir' => ".",
+        'toplevel' => [],
         'tarcopy' => 0,
         'use_config' => 1,
         'vcd' => 0,
@@ -225,6 +226,9 @@ Getopt::Long::Configure ('no_auto_abbrev') ;
         'vcs_use_cli' => 0,
         'vcs_use_initreg' => 0,
         'vcs_use_sdf' => 0,
+        'vlt_build' => 0,
+        'vlt_build_args' => [],
+        'vlt_run' => 0,
         'version' => 0,
         'vfile' => [],
         'mem_init_py' => ""
@@ -463,14 +467,16 @@ else { $model_path = "$model_dir/$opt{model}/$opt{build_id}" ; }
 ################################################################################
 
 &create_model_path () if ($opt{vcs_build} or $opt{other_sim_build} or
-                          $opt{icv_build} or $opt{ncv_build} or $opt{msm_build}) ;
+                          $opt{icv_build} or $opt{ncv_build} or
+                          $opt{msm_build} or $opt{vlt_build}) ;
 
 ################################################################################
 # do some pre building stuff - generate flist
 ################################################################################
 
 &pre_build () if ($opt{vcs_build} or $opt{other_sim_build} or
-                  $opt{icv_build} or $opt{ncv_build} or $opt{msm_build}) ;
+                  $opt{icv_build} or $opt{ncv_build} or
+                  $opt{msm_build} or $opt{vlt_build}) ;
 
 ################################################################################
 # build the simulation model
@@ -478,7 +484,7 @@ else { $model_path = "$model_dir/$opt{model}/$opt{build_id}" ; }
 
 &generic_sim_build () if ($opt{vcs_build} or $opt{ncv_build} or
                           $opt{icv_build} or $opt{other_sim_build} or
-                          $opt{msm_build}) ;
+                          $opt{msm_build} or $opt{vlt_build}) ;
 
 ################################################################################
 # assemble .s diag
@@ -494,7 +500,8 @@ else { $model_path = "$model_dir/$opt{model}/$opt{build_id}" ; }
 
 &oram_image () if (($opt{vcs_run} or $opt{ncv_run} or
                     $opt{icv_run} or $opt{other_sim_run} or
-                    $opt{msm_run}) and $opt{oram}); #if ($opt{image_diag_name}
+                    $opt{msm_run} or $opt{vlt_run}) and
+                    $opt{oram}); #if ($opt{image_diag_name}
 
 ################################################################################
 # launch simulator
@@ -502,7 +509,7 @@ else { $model_path = "$model_dir/$opt{model}/$opt{build_id}" ; }
 
 &generic_sim_run () if ($opt{vcs_run} or $opt{ncv_run} or
                         $opt{icv_run} or $opt{other_sim_run} or
-                        $opt{msm_run}) ;
+                        $opt{msm_run} or $opt{vlt_run}) ;
 
 ################################################################################
 # run diag.pl if present
@@ -511,7 +518,7 @@ else { $model_path = "$model_dir/$opt{model}/$opt{build_id}" ; }
 if (    -e "diag.pl" and
   ( $opt{vcs_run} or $opt{ncv_run} or
       $opt{icv_run} or $opt{other_sim_run} or
-      $opt{msm_run}) and
+      $opt{msm_run} or $opt{vlt_run}) and
        $opt{run_diag_pl} )
 {
   print "$prg: executing diag.pl\n";
@@ -528,7 +535,7 @@ if (    -e "diag.pl" and
 
 &post_process if ($opt{vcs_run} or $opt{ncv_run} or
                   $opt{icv_run} or $opt{other_sim_run} or
-                  $opt{msm_run}) ;
+                  $opt{msm_run} or $opt{vlt_run}) ;
 
 &print_footer () ;
 
@@ -865,6 +872,8 @@ sub regress
           $cmd .= "-icv_build " ;
       } elsif (($opt{sim_type}) eq "msm") {
           $cmd .= "-msm_build " ;
+      } elsif (($opt{sim_type}) eq "vlt") {
+          $cmd .= "-vlt_build " ;
       } else {
           $cmd .= "-other_sim_build " ;
       }
@@ -935,6 +944,8 @@ sub regress
             push (@cmd, "-icv_run") ;
           } elsif (($opt{sim_type}) eq "msm") {
             push (@cmd, "-msm_run") ;
+          } elsif (($opt{sim_type}) eq "vlt") {
+            push (@cmd, "-vlt_run") ;
           } else {
             push (@cmd, "-other_sim_run") ;
           }
@@ -1230,12 +1241,29 @@ sub pre_build
 
   system("cp -f flist $cur_dir");
 
+  if($opt{ariane}) {
+    print "compiling DTS and bootroms for Ariane...\n";
+    !system("cd $ENV{ARIANE_ROOT}/openpiton/bootrom/baremetal && make clean && make all && cd - > /dev/null") or
+      die (" Error compiling DTS for ariane.");
+    !system("cd $ENV{ARIANE_ROOT}/openpiton/bootrom/linux && make clean && make all MAX_HARTS=$ENV{PTON_NUM_TILES} && cd - > /dev/null") or
+      die (" Error compiling DTS for ariane.");
+    print "done\n";
+    # currently we have two sources (hardcoded in chipset_impl): UART and Ethernet
+    my $num_sources = 2;
+    # 2 targets per core (M/S mode)
+    my $num_targets = 2 * $ENV{PTON_NUM_TILES};
+    print "generating PLIC for Ariane with $num_targets targets and $num_sources sources...\n";
+    !system("cd $ENV{ARIANE_ROOT}/src/rv_plic/rtl && ./gen_plic_addrmap.py -t $num_targets -s $num_sources > plic_regmap.sv") or
+      die (" Error generating PLIC for Ariane.");
+    print "done\n";
+  }
+
   # go back to where this block was invoked
   chdir $cur_dir ;
 }
 
 ################################################################################
-# generic simulator build (incorporates vcs, ncv, icv, msm, other)
+# generic simulator build (incorporates vcs, ncv, icv, msm, vlt, other)
 ################################################################################
 
 sub generic_sim_build
@@ -1288,6 +1316,10 @@ sub generic_sim_build
       $lib_path = "-L$ENV{DV_ROOT}/tools/";
       $lib_path .= $os_cpu_slash;
       $lib_path .= "/lib ";
+
+      foreach my $top_n (@{$opt{toplevel}}) {
+        push(@{$opt{vcs_build_args}}, "-top $top_n") ;
+      }
 
       push (@{$opt{vcs_build_args}}, "+compsdf") if ($opt{vcs_use_sdf}) ;
       push (@{$opt{vcs_build_args}}, "+initreg") if ($opt{vcs_use_initreg}) ;
@@ -1370,13 +1402,15 @@ sub generic_sim_build
 
     }
     if ($opt{icv_build}) {
-      push (@{$opt{icv_build_args}}, "-s cmp_top") ;
+      foreach my $top_n (@{$opt{toplevel}}) {
+        push (@{$opt{icv_build_args}}, "-s $top_n") ;
+      }
 #      push (@{$opt{icv_build_args}}, "-I $ENV{DV_ROOT}/design/include") ;
 #      push (@{$opt{icv_build_args}}, "-I $ENV{DV_ROOT}/design/chipset/include") ;
       push (@{$opt{icv_build_args}}, "-g 2001") ;
     }
 
-    # copy vcs/icv/ncv/msm_build_args to generic sim_build_args
+    # copy vcs/icv/ncv/msm/vlt_build_args to generic sim_build_args
     if ($opt{vcs_build}) {
       foreach my $x (@{$opt{vcs_build_args}})
       {
@@ -1401,6 +1435,12 @@ sub generic_sim_build
           push (@{$opt{sim_build_args}}, $x);
       }
     }
+    if ($opt{vlt_build}) {
+      foreach my $x (@{$opt{vlt_build_args}})
+      {
+          push (@{$opt{sim_build_args}}, $x);
+      }
+    }
 
     if ($opt{ncv_build}) {
       $ld_lib_path .= "$ENV{DV_ROOT}/tools/";
@@ -1416,9 +1456,18 @@ sub generic_sim_build
     print "$prg: Building rtl model\n" ;
 
     if ($opt{vcs_build}) {
-      $build_cmd  = "vcs " ;
+      if ($ENV{VCS_BIN}) {
+        $build_cmd = "$ENV{VCS_BIN} ";
+      } else {
+        $build_cmd  = "vcs " ;
+      }
       # lib_path needs to be before vcs_build_args
       $build_cmd .= $lib_path;
+
+      # the ariane files do not contain the timescale
+      if ($opt{ariane}) {
+        $build_cmd .= " -timescale=1ps/1ps ";
+      }
     }
     if ($opt{ncv_build}) {
       $build_cmd = "LD_LIBRARY_PATH=";
@@ -1436,6 +1485,30 @@ sub generic_sim_build
       }
       # compile everything as one compile unit (in order to keep the global defines in config.v)
       $build_cmd .= " -mfcu ";
+      # also suppress the following warning, which unfortunately is hardly avoidable when using
+      # always_comb blocks that operate on arrays inside a generate statement.
+      # [SVCHK] - Some checking for conflicts with always_comb and always_latch variables not yet supported.
+      $build_cmd .= " -suppress 2583 ";
+    }
+    if ($opt{vlt_build}) {
+      $build_cmd = "verilator -cc " ;
+      $build_cmd .= "-exe $dv_root/tools/verilator/my_top.cpp " ;
+      $build_cmd .= "$dv_root/tools/pli/iop/b_ary.c " ;
+      $build_cmd .= "$dv_root/tools/pli/iop/bw_lib.c " ;
+      $build_cmd .= "$dv_root/tools/pli/iop/iob_main.cc " ;
+      $build_cmd .= "$dv_root/tools/pli/iop/iob.cc " ;
+      $build_cmd .= "$dv_root/tools/pli/iop/cpx.cc " ;
+      $build_cmd .= "$dv_root/tools/pli/iop/pcx.cc " ;
+      $build_cmd .= "--top-module cmp_top " ;
+      $build_cmd .= "-Wno-fatal " ;
+      $build_cmd .= "-Wno-BLKANDNBLK " ;
+      $build_cmd .= "-DPITON_DPI " ;
+      $build_cmd .= "--unroll-count 256 " ;
+      $build_cmd .= "-CFLAGS -DVERILATOR " ;
+      $build_cmd .= "-CFLAGS -DPITON_DPI " ;
+      $build_cmd .= "-CFLAGS -lstdc++ " ;
+      $build_cmd .= "-CFLAGS -I$dv_root/tools/pli/iop " ;
+      $build_cmd .= "-CFLAGS -I$dv_root/tools/verilator " ;
     }
     if ($opt{other_sim_build}) {
       if (($opt{other_sim_build_cmd}) eq "") {
@@ -1474,12 +1547,23 @@ sub generic_sim_build
       die ("DIE. failed building model") if ($?) ;
     }
 
+    if ($opt{vlt_build}) {
+      $build_cmd = "make -j -C $model_path/obj_dir -f Vcmp_top.mk Vcmp_top" ;
+
+      print "$prg: $build_cmd\n";
+
+      if (! $opt{dryrun}) {
+        system ($build_cmd) ;
+        die ("DIE. failed building model") if ($?) ;
+      }
+    }
+
     # go back to where the script was invoked
     chdir $cur_dir ;
 }
 
 ################################################################################
-# generic simulator run (incorporates vcs, ncv, icv, msm, other)
+# generic simulator run (incorporates vcs, ncv, icv, msm, vlt, other)
 ################################################################################
 
 sub generic_sim_run
@@ -1504,6 +1588,7 @@ sub generic_sim_run
     die ("DIE. INCA_libs not found in $model_path") if ($opt{ncv_run} and ! -e "$model_path/INCA_libs") ;
     die ("DIE. a.out not found in $model_path") if ($opt{icv_run} and ! -e "$model_path/a.out") ;
     die ("DIE. work/ not found in $model_path") if ($opt{msm_run} and ! -d "$model_path/work") ;
+    die ("DIE. obj_dir/ not found in $model_path") if ($opt{vlt_run} and ! -d "$model_path/obj_dir") ;
 
     # pass the good trap and bad trap addresses to the testbench
     my $good_trap = "";
@@ -1521,37 +1606,25 @@ sub generic_sim_run
       my @bad_trap ;
 
       if ($#good_trap_list >= 0) {
+        $good_trap = "" ;
+        my $trap_i=0;
         foreach my $trap (@good_trap_list) {
           my ($tmp1, $va, $ra, $pa) = ($trap =~ /([\w_\.]+)\s+(\w+)\s+(\w+)\s+(\w+)/) ;
+          $good_trap .= " +good_trap$trap_i=" . $pa ;
+          $trap_i++;
           $good_trap_list{$pa} = 1 ;
-        }
-
-        foreach my $x (sort (keys (%good_trap_list))) {
-          push (@good_trap, $x) ;
-        }
-
-        if ($#good_trap == 0) {
-          $good_trap = "+good_trap=" . $good_trap[0] ;
-        } else {
-          $good_trap = "+good_trap=" . join (':', @good_trap) ;
         }
       }
 
       if ($#bad_trap_list >= 0)
       {
+        $bad_trap = "" ;
+        my $trap_i=0;
         foreach my $trap (@bad_trap_list) {
           my ($tmp1, $va, $ra, $pa) = ($trap =~ /([\w_\.]+)\s+(\w+)\s+(\w+)\s+(\w+)/) ;
+          $bad_trap .= " +bad_trap$trap_i=" . $pa ;
+          $trap_i++;
           $bad_trap_list{$pa} = $pa;
-        }
-
-        foreach my $x (sort (keys (%bad_trap_list))) {
-          push (@bad_trap, $x) ;
-        }
-
-        if ($#bad_trap == 0) {
-          $bad_trap = "+bad_trap=" . $bad_trap[0] ;
-        } else {
-          $bad_trap = "+bad_trap=" . join (':', @bad_trap) ;
         }
       }
     }
@@ -1659,10 +1732,19 @@ sub generic_sim_run
       if (!$opt{gui}) {
         $cmd .= " -c " ;
       }
+      if ($opt{log_all}) {
+      	# this logs everything such that the sim can be inspected later on
+      	print("$prg: dumping all waves to save.wlf - this file can get very large so make sure you run this on a fast disk with enough space.\n");
+      	$cmd .= " -wlfcompress -wlf all-waves.wlf -do \"log -r /*\" ";
+      }
       $cmd .= "-lib ";
       $cmd .= "$model_path/work ";
       $cmd .= "-do \"run -all\" ";
-      $cmd .= "cmp_top ";
+
+      foreach my $top_n (@{$opt{toplevel}}) {
+        $cmd .= "$top_n ";
+      }
+
       $cmd .= "-pli \"";
       $cmd .= "$ENV{DV_ROOT}/tools/";
       $cmd .= $os_cpu_slash;
@@ -1672,6 +1754,11 @@ sub generic_sim_run
       print("====================================\n$cmd\n====================================");
     }
 
+    if ($opt{vlt_run}) {
+      $cmd .= "$model_path/obj_dir/Vcmp_top " ;
+      $cmd .= " " ;
+      $cmd .= join (" ", @{$opt{sim_run_args}}) ;
+    }
 
     if ($opt{other_sim_run}) {
       if (($opt{other_sim_run_cmd}) eq "") {
@@ -1690,7 +1777,7 @@ sub generic_sim_run
       close (NCVCMD) ;
       `chmod +x ncv_cmd`;
 
-      $cmd = "ncv_cmd";
+      $cmd = "./ncv_cmd";
 
       $ENV{LD_LIBRARY_PATH} = $ld_lib_path;
     }
@@ -2104,7 +2191,12 @@ sub assemble_diag
       # only recompile if necessary
       if (!$opt{precompiled}) {
         print "$prg: assembling 64bit riscv diag (RV64IMAC)\n" ;
-        my $cmd = "rv64_cc ${diag_name} $ENV{PTON_NUM_TILES}" ;
+        my $defs = "-DPITON_NUMTILES=$ENV{PTON_NUM_TILES} ";
+        if ($opt{uart_dmw}) {
+          $defs .= " -DPITONSTREAM ";
+        }
+        $defs .= $opt{gcc_args};
+        my $cmd = "rv64_cc ${diag_name} \"$defs\"" ;
         print "$prg: $cmd\n";
         my $waitstatus = call_program($cmd, "rv64_cc.log");
         die ("DIE. rv64_cc compilation error") if ($waitstatus) ;
@@ -2303,6 +2395,8 @@ sub parse_args
             'asm_diag_root=s@',
             'build!',
             'precompiled!',
+            'gcc_args=s',
+            'uart_dmw!',
             'trap_offset=s',
             'config_cpp_args=s@',
             'config_rtl=s@',
@@ -2375,6 +2469,7 @@ sub parse_args
             'sys=s',
             'tg_seed=i',
             'tmp_dir=s',
+            'toplevel=s@',
             'tarcopy!',
             'use_config!',
             'vcd!',
@@ -2397,11 +2492,15 @@ sub parse_args
             'vcs_use_sdf!',
             'verbose!',
             'vfile=s@',
+            'vlt_build!',
+            'vlt_build_args=s@',
+            'vlt_run!',
             'num_tile=s',
             'x_tiles=s',
             'y_tiles=s',
             'dynamic_csm=s',
             'gui!',
+            'log_all!',
             'debug_all!',
             'ibm!',
             'ed_enable!',
@@ -2490,6 +2589,7 @@ sub parse_args
     $opt{ncv_build} = 0 ;
     $opt{icv_build} = 0 ;
     $opt{msm_build} = 0 ;
+    $opt{vlt_build} = 0 ;
     $opt{other_sim_build} = 0 ;
   }
 
@@ -2537,10 +2637,10 @@ sub parse_args
   push (@{$opt{config_rtl}}, "PITON_PICO")     if ($opt{pico});
   push (@{$opt{config_rtl}}, "PITON_PICO_HET") if ($opt{pico_het});
   push (@{$opt{config_rtl}}, "PITON_ARIANE")   if ($opt{ariane});
-  push (@{$opt{config_rtl}}, "L2_CAM_MSHR")    if ($opt{ariane});
+  push (@{$opt{config_rtl}}, "WT_DCACHE")      if ($opt{ariane});
 
 
-  if ($opt{pico} or $opt{pico_het}) {
+  if ($opt{pico} or $opt{pico_het} or $opt{ariane}) {
     push (@{$opt{config_rtl}}, "NO_MRA_VAL") ;
     push (@{$opt{config_rtl}}, "NO_SLAM_RANDOM") ;
   }
@@ -2620,7 +2720,7 @@ sub parse_args
   push (@{$opt{config_rtl}}, "ORAM_ON") if ($opt{oram}) ;
   push (@{$opt{sim_run_args}}, "+oram") if ($opt{oram}) ;
 
-  if ($opt{msm_build} or $opt{icv_build}) {
+  if ($opt{msm_build} or $opt{icv_build} or $opt{vlt_build}) {
       push(@{$opt{config_rtl}}, "NO_SLAM_RANDOM") ;
       push(@{$opt{config_rtl}}, "NO_MRA_VAL") ;
   }
@@ -2752,6 +2852,9 @@ OPENPITON ARGUMENTS
             model specified by the -sys option, the -debug_all argument
             must have been passed to sims.
 
+    -log_all
+            in a msm_run, this command logs all signals and dumps them to the "all-waves.wlf" file for later inspection with a wave viewer.
+
     -slurm -sim_q_command=sbatch
             specifies simulations should be submitted with the Simple Linux
             Utility for Resource Management (SLURM) and run in parallel. The
@@ -2760,8 +2863,8 @@ OPENPITON ARGUMENTS
 
 VERILOG COMPILATION RELATED
 
-    -sim_type=vcs/ncv/icv/msm
-         defines which simulator to use vcs, ncverilog, icarus, or modelsim, defaults to vcs.
+    -sim_type=vcs/ncv/icv/msm/vlt
+         defines which simulator to use vcs, ncverilog, icarus, modelsim, or verilator, defaults to vcs.
 
     -sim_q_command="command"
          defines which job queue manager command to use to launch jobs.
@@ -2785,6 +2888,13 @@ VERILOG COMPILATION RELATED
            builds a modelsim model. defaults to off.
 
     -msm_build_args=OPTION
+           modelsim compile options. multiple options can be specified using
+           multiple such arguments.
+
+    -vlt_build/-novlt_build
+           builds a verilator model. defaults to off.
+
+    -vlt_build_args=OPTION
            modelsim compile options. multiple options can be specified using
            multiple such arguments.
 
@@ -2832,8 +2942,20 @@ VERILOG COMPILATION RELATED
            is $ENV{MODEL_DIR}/model/build_id.
 
     -build_id=NAME
-            specify the build id of the model to be built. the full path
-            to a model is $ENV{MODEL_DIR}/model/build_id.
+           specify the build id of the model to be built. the full path
+           to a model is $ENV{MODEL_DIR}/model/build_id.
+
+    -pico
+           this specifies that the PICORV32 core shall be used instead of OpenSPARC.
+           in this case, programs are compiled and assembled using the RISCV GCC toolchain.
+
+    -pico_het
+           this specifies that a heterogeneous arrangement with OpenSPARC and PICORV32 shall be built,
+           where every odd core is a PICORV32 core (along the x-dimension).
+
+    -ariane
+           this specifies that the ARIANE RV64GC core shall be used instead of OpenSPARC.
+           in this case, programs are compiled and assembled using the RISCV GCC toolchain.
 
 VERILOG RUNTIME RELATED
 
@@ -2885,6 +3007,25 @@ midas is the diag assembler
     -midas_use_tgseed
            Add -DTG_SEED=tg_seed to midas command line. Use -tg_seed to
            set the value passed to midas or use a random value from /dev/random.
+
+RISCV GCC
+
+this is the compiler used for RISC-V cores (e.g., when the -pico or -ariane switches are specified).
+
+    -uart_dmw
+           use this switch when compiling code for Pitonstream. this will add load
+           instructions to magic addresses in the pass/fail exit functions in order to signal
+           PASS/FAIL to the UART-DMW module.
+
+    -precompiled
+           specify this in order to use pre-built assembly tests and benchmarks from the RISC-V toolchain folder.
+           this basically adds the two search paths
+             $ENV{ARIANE_ROOT}/tmp/riscv-tests/build/isa
+             $ENV{ARIANE_ROOT}/tmp/riscv-tests/build/benchmarks
+           to @{$opt{asm_diag_root}}, and skips the compilation step.
+
+    -gcc_args
+           additional gcc arguments
 
 VCS COVERMETER
 
@@ -3109,6 +3250,10 @@ Build an icarus model using DV_ROOT as design root
 Build a modelsim model using DV_ROOT as design root
 
   sims -sys=manycore -x_tiles=1 -y_tiles=1 -msm_build
+
+Build a verilator model using DV_ROOT as design root
+
+  sims -sys=manycore -x_tiles=1 -y_tiles=1 -vlt_build
 
 Build a model from any design root
 

@@ -34,8 +34,35 @@
     from pyhplib import *
 %>
 
+`ifdef PITON_DPI
+import "DPI-C" function longint read_64b_call (input longint addr);
+import "DPI-C" function void write_64b_call (input longint addr, input longint data);
+import "DPI-C" function int drive_iob ();
+import "DPI-C" function int get_cpx_word (int index);
+import "DPI-C" function void report_pc (longint thread_pc);
+import "DPI-C" function void init_jbus_model_call(string str, int oram);
+`endif
+
 `timescale 1ps/1ps
-module cmp_top ();
+module cmp_top (
+`ifdef VERILATOR
+input reg                             core_ref_clk,
+
+input reg                             sys_rst_n,
+
+input reg                             pll_rst_n,
+
+input reg                             clk_en,
+
+input reg                             pll_bypass,
+input reg [4:0]                       pll_rangea,
+output wire                            pll_lock,
+input reg [1:0]                       clk_mux_sel,
+input reg                             async_mux,
+input                                 diag_done,
+input                                 ok_iob
+`endif
+);
 
 //////////////////////
 // Type Declarations
@@ -88,10 +115,12 @@ reg [3:0]                       stub_pass;
 // Simulated Clocks
 ////////////////////
 
+`ifndef VERILATOR
 `ifndef USE_FAKE_PLL_AND_CLKMUX
 always #5000 core_ref_clk = ~core_ref_clk;                      // 100MHz
 `else
 always #500 core_ref_clk = ~core_ref_clk;                       // 1000MHz
+`endif
 `endif
 
 `ifndef SYNC_MUX
@@ -100,6 +129,7 @@ always #1429 io_clk = ~io_clk;                                  // 350MHz
 always @ * io_clk = core_ref_clk;
 `endif
 
+`ifndef VERILATOR
 always #50000 jtag_clk = ~jtag_clk;                             // 10MHz
 
 always #2500 chipset_clk_osc_p = ~chipset_clk_osc_p;            // 200MHz
@@ -118,11 +148,13 @@ always @ * passthru_chipset_clk_n = ~passthru_chipset_clk_p;
 always #1000 mem_clk = ~mem_clk;                                // 500MHz
 
 always #25000 spi_sys_clk = ~spi_sys_clk;                       // 20MHz
+`endif
 
 ////////////////////////////////////////////////////////
 // SIMULATED BOOT SEQUENCE
 ////////////////////////////////////////////////////////
 
+`ifndef VERILATOR
 initial
 begin
     // These are not referenced elsewhere in this module,
@@ -185,14 +217,22 @@ begin
     // Init JBUS model plus some ORAM stuff
     if ($test$plusargs("oram"))
     begin
+`ifndef PITON_DPI
         $init_jbus_model("mem.image", 1);
+`else // ifndef PITON_DPI
+        init_jbus_model_call("mem.image", 1);
+`endif // ifndef PITON_DPI
 `ifndef __ICARUS__
         force system.chip.ctap_oram_clk_en = 1'b1;
 `endif
     end
     else
     begin
+`ifndef PITON_DPI
         $init_jbus_model("mem.image", 0);
+`else // ifndef PITON_DPI
+        init_jbus_model_call("mem.image", 0);
+`endif // ifndef PITON_DPI
     end
 
 
@@ -223,6 +263,13 @@ begin
     cmp_top.system.chipset.chipset_impl.ciop_fake_iob.ok_iob = 1'b1;
 `endif // endif PITONSYS_IOCTRL
 end
+`endif
+
+`ifdef VERILATOR
+always @(posedge ok_iob) begin
+    cmp_top.system.chipset.chipset_impl.ciop_fake_iob.ok_iob = 1'b1;
+end
+`endif
 
 ////////////////////////////////////////////////////////
 // SYNTHESIZABLE SYSTEM
@@ -261,7 +308,11 @@ system system(
     .chipset_clk_osc(chipset_clk_osc),
 `endif // endif PITON_CHIPSET_DIFF_CLK
 `else // ifndef PITON_CHIPSET_CLKS_GEN
+`ifndef VERILATOR
     .chipset_clk(chipset_clk),
+`else
+    .chipset_clk(core_ref_clk),
+`endif
 `ifndef PITONSYS_NO_MC
 `ifdef PITON_FPGA_MC_DDR3
     .mc_clk(mem_clk),
@@ -379,7 +430,7 @@ system system(
     monitor   monitor(
         .clk    (`CHIP_INT_CLK),
         .cmp_gclk  (`CHIP_INT_CLK),
-        .rst_l     (`SPARC_CORE0.reset_l)
+        .rst_l     (`CORE_REF0.reset_l)
         );
 
 `ifndef MINIMAL_MONITORING
@@ -434,8 +485,10 @@ system system(
             print tt
     %>
 
+`ifndef VERILATOR
     // T1's TSO monitor, stripped of all L2 references
-    tso_mon tso_mon(`CHIP_INT_CLK, `SPARC_CORE0.reset_l);
+    tso_mon tso_mon(`CHIP_INT_CLK, `CORE_REF0.reset_l);
+`endif
 
     // L15 MONITORS
     cmp_l15_messages_mon l15_messages_mon(
@@ -482,7 +535,7 @@ system system(
     sas_intf  sas_intf(/*AUTOINST*/
         // Inputs
         .clk       (`CHIP_INT_CLK),      // Templated
-        .rst_l     (`SPARC_CORE0.reset_l));       // Templated
+        .rst_l     (`CORE_REF0.reset_l));       // Templated
 `endif
 `endif
 
@@ -492,7 +545,7 @@ system system(
     sas_tasks sas_tasks(/*AUTOINST*/
         // Inputs
         .clk      (`CHIP_INT_CLK),      // Templated
-        .rst_l        (`SPARC_CORE0.reset_l));       // Templated
+        .rst_l        (`CORE_REF0.reset_l));       // Templated
 `endif
 `endif
 

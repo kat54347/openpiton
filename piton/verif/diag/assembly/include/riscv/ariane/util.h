@@ -31,6 +31,7 @@
 
 // some OpenPiton-specific defines
 #define PITON_UART_ADDRESS  0xFFF0C2C000ULL
+// this is used in piton stream to terminate correctly
 #define PITON_TEST_GOOD_END 0x8100000000ULL
 #define PITON_TEST_BAD_END  0x8200000000ULL
 
@@ -56,6 +57,19 @@ extern void setStats(int enable);
     : "r" (i)                                    \
     : "memory");
 
+#define LR_OP(ret, mem, asm_type)               \
+  __asm__ __volatile__ (                        \
+    " lr." #asm_type " %1, %0"                  \
+    : "+A" (mem), "=r" (ret)                    \
+    :                                           \
+    : "memory");
+
+#define SC_OP(ret, mem, i, asm_type)            \
+  __asm__ __volatile__ (                        \
+    " sc." #asm_type " %1, %2, %0"              \
+    : "+A" (mem), "=r" (ret)                    \
+    : "r" (i)                                   \
+    : "memory");
 
 #define static_assert(cond) switch(0) { case 0: case !!(long)(cond): ; }
 
