@@ -927,6 +927,8 @@ if (TILE_TYPE == `VEXRISCV_TILE) begin : g_vexriscv_core
 
     wire         vex_int;
 
+    reg          resetn;
+
     VexRiscv core(
        .iBus_cmd_valid           (vex_transducer_iBus_cmd_valid),
        .iBus_cmd_payload_pc      (vex_transducer_iBus_cmd_payload_pc),
@@ -954,7 +956,6 @@ if (TILE_TYPE == `VEXRISCV_TILE) begin : g_vexriscv_core
        .reset  (~resetn) 
     );
 
-    reg        resetn;
 
     always @ (posedge clk) begin
         if(!rst_n_f) begin

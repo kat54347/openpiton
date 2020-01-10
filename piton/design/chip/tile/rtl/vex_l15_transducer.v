@@ -43,9 +43,9 @@ module vex_l15_transducer (
     input                           l15_transducer_header_ack,
 
     // outputs vex uses                    
-    output [4:0]                    transducer_l15_rqtype,
+    output reg [4:0]                transducer_l15_rqtype,
     output [`L15_AMO_OP_WIDTH-1:0]  transducer_l15_amo_op,
-    output [2:0]                    transducer_l15_size,
+    output reg [2:0]                transducer_l15_size,
     output                          transducer_l15_val,
     output [`PHY_ADDR_WIDTH-1:0]    transducer_l15_address,
     output [63:0]                   transducer_l15_data,
@@ -69,18 +69,18 @@ module vex_l15_transducer (
     input [63:0]                    l15_transducer_data_0,
     input [63:0]                    l15_transducer_data_1,
    
-    output                          transducer_vex_iBus_cmd_ready,        
-    output                          transducer_vex_iBus_rsp_valid,        
+    output reg                      transducer_vex_iBus_cmd_ready,        
+    output reg                      transducer_vex_iBus_rsp_valid,        
     output                          transducer_vex_iBus_rsp_payload_error,
     output [31:0]                   transducer_vex_iBus_rsp_payload_inst, 
 
-    output                          transducer_vex_dBus_cmd_ready,        
-    output                          transducer_vex_dBus_rsp_ready,        
+    output reg                      transducer_vex_dBus_cmd_ready,        
+    output reg                      transducer_vex_dBus_rsp_ready,        
     output                          transducer_vex_dBus_rsp_error,        
     output [31:0]                   transducer_vex_dBus_rsp_data,         
     
     output                          transducer_l15_req_ack,
-    output                          vex_int
+    output reg                      vex_int
 );
 
 // not supported at the moment
@@ -99,6 +99,7 @@ reg prev_val;
 // is this a new request from vex?
 // TODO: mux between iBus and dBus?
 wire new_request = current_val & ~prev_val;
+reg req_active_reg;
 always @ (posedge clk)
 begin
     if (!rst_n) begin
@@ -106,7 +107,7 @@ begin
         prev_val <= 0;
     end
     else begin
-        current_val <= vex_transducer_dBus_cmd_valid | vex_transducer_iBus_cmd_valid;
+        current_val <= (vex_transducer_dBus_cmd_valid | vex_transducer_iBus_cmd_valid) & ~req_active_reg;
         prev_val <= current_val;
     end
 end 
@@ -137,8 +138,8 @@ end
 
 reg data_req_reg;
 reg data_req_next;
-reg req_active_reg;
 reg req_active_next;
+wire vex_data_req;
 always @ (posedge clk) begin
     if (!rst_n) begin
         data_req_reg <= 1'b0;
@@ -153,7 +154,7 @@ always @ (*) begin
     // be careful with these conditionals.
     if (l15_transducer_val) begin
         data_req_next = 1'b0;
-        req_active_reg = 1'b0;
+        req_active_next = 1'b0;
     end
     else if (new_request) begin
         data_req_next = vex_data_req;
@@ -172,7 +173,8 @@ end
 assign transducer_l15_val = (ack_reg == ACK_WAIT) ? (vex_transducer_dBus_cmd_valid | vex_transducer_iBus_cmd_valid) 
                                 : (ack_reg == ACK_IDLE) ? new_request
                                 : (vex_transducer_dBus_cmd_valid | vex_transducer_iBus_cmd_valid);
-reg vex_data_req = transducer_l15_val & vex_transducer_dBus_cmd_valid;
+assign vex_data_req = transducer_l15_val & vex_transducer_dBus_cmd_valid;
+assign vex_instr_req = transducer_l15_val & vex_transducer_iBus_cmd_valid;
 reg [31:0] vex_wdata_flipped;
 
 // unused wires tie to zero
@@ -190,16 +192,28 @@ assign transducer_l15_l1rplway = 2'b0;
 assign transducer_l15_invalidate_cacheline = 1'b0;
 
 // logic to check if a request is new
-assign transducer_l15_address = vex_data_req ? {{8{vex_transducer_dBus_cmd_payload_address[31]}}, vex_transducer_dBus_cmd_payload_address}
-                                            : {{8{vex_transducer_iBus_cmd_payload_pc[31]}}, vex_transducer_iBus_cmd_payload_pc};
+//assign transducer_l15_address = vex_data_req ? {{8{vex_transducer_dBus_cmd_payload_address[31]}}, vex_transducer_dBus_cmd_payload_address}
+//                                            : {{8{vex_transducer_iBus_cmd_payload_pc[31]}}, vex_transducer_iBus_cmd_payload_pc};
+assign transducer_l15_address = vex_data_req ? {8'b0, vex_transducer_dBus_cmd_payload_address}
+                                            : {8'b0, vex_transducer_iBus_cmd_payload_pc};
 
-assign transducer_l15_nc = transducer_l15_address[31] | (transducer_l15_rqtype == `PCX_REQTYPE_AMO);
+assign transducer_l15_nc = (transducer_l15_rqtype == `PCX_REQTYPE_AMO);
 
 assign transducer_l15_data = {vex_wdata_flipped, vex_wdata_flipped};
 // set rqtype specific data
 always @ *
 begin
-    if (transducer_l15_val & vex_data_req) begin
+    transducer_vex_dBus_cmd_ready = 1'b0;
+    transducer_vex_iBus_cmd_ready = 1'b0;
+    if (transducer_l15_val & ~vex_data_req) begin
+        vex_wdata_flipped = 32'b0;
+        transducer_l15_rqtype = `LOAD_RQ;
+        transducer_l15_size = `PCX_SZ_4B;
+        if (l15_transducer_ack) begin
+            transducer_vex_iBus_cmd_ready = 1'b1;
+        end
+    end
+    else if (transducer_l15_val & vex_data_req) begin
         case(vex_transducer_dBus_cmd_payload_size)
             2'b10: begin
                 transducer_l15_size = `PCX_SZ_4B;
@@ -215,6 +229,9 @@ begin
                 transducer_l15_size = 0;
             end
         endcase
+        if (l15_transducer_ack) begin
+            transducer_vex_dBus_cmd_ready = 1'b1;
+        end
 
         // store or atomic operation 
         if (vex_transducer_dBus_cmd_payload_wr) begin
@@ -234,11 +251,6 @@ begin
             vex_wdata_flipped = 32'b0;
             transducer_l15_rqtype = `LOAD_RQ;
         end 
-    end
-    else if (transducer_l15_val & ~vex_data_req) begin
-        vex_wdata_flipped = 32'b0;
-        transducer_l15_rqtype = `LOAD_RQ;
-        transducer_l15_size = `PCX_SZ_4B;
     end
     else begin
         vex_wdata_flipped = 32'b0;
@@ -276,7 +288,7 @@ end
 always @ * begin
     transducer_vex_iBus_rsp_valid = 1'b0;
     transducer_vex_dBus_rsp_ready = 1'b0;
-    if (l15_transducer_val & req_active_reg) begin
+    if (l15_transducer_val) begin
         case(l15_transducer_returntype)
             `LOAD_RET, `CPX_RESTYPE_ATOMIC_RES: begin
                 // load

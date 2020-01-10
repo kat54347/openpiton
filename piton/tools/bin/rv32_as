@@ -35,7 +35,7 @@ riscv32-unknown-elf-gcc -march=rv32ima -mabi=ilp32 -nostdlib -nostartfiles   \
 #riscv32-unknown-elf-objcopy --reverse-bytes 4 -I elf32-littleriscv -O binary diag.exe diag.o
 riscv32-unknown-elf-objcopy -I elf32-littleriscv -O binary diag.exe diag.o
 du diag.o -b | awk '{print(128 - ($1 % 128));}' | xargs -t -ISIZE truncate diag.o -s +SIZE
-printf "\n@0000000040000000\t// Section '.RED_SEC', segment 'text'\n" >mem.image
+printf "\n@0000000080000000\t// Section '.RED_SEC', segment 'text'\n" >mem.image
 #od -tx -v -An -w32 diag.o >>mem.image
 xxd -g 16 -c 32 diag.o | awk '{printf("%s %s\n", $2, $3);}' >>mem.image
 
