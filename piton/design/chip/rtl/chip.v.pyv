@@ -1119,6 +1119,8 @@ module chip(
                 currenttile = currenttile.replace("TYPE_OF_TILE", "`PICORV32_TILE")
             elif (PITON_ARIANE):
                 currenttile = currenttile.replace("TYPE_OF_TILE", "`ARIANE_RV64_TILE")
+            elif (PITON_VEX):
+                currenttile = currenttile.replace("TYPE_OF_TILE", "`VEXRISCV_TILE")
             else:
                 currenttile = currenttile.replace("TYPE_OF_TILE", "`SPARC_TILE")
 

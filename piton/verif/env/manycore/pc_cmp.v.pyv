@@ -256,12 +256,33 @@ endtask // get_thread_status
                     spc0_inst_done <= `PICO_CORE0.launch_next_insn;
                     spc0_phy_pc_w <= {{16{`PICO_CORE0.reg_pc[31]}}, `PICO_CORE0.reg_pc[31:0]};
                 end
+        `else // RTL_PICO0
+        `ifdef RTL_VEX0
+                assign spc0_thread_id = 2'b00;
+                assign spc0_rtl_pc = spc0_phy_pc_w;
+
+                always @*
+                begin
+                    if (`TILE0.g_vexriscv_core.vex_int == 1'b1)
+                    begin
+                        active_thread[(0*4)] = 1'b1;
+                        active_thread[(0*4)+1] = 1'b1;
+                        active_thread[(0*4)+2] = 1'b1;
+                        active_thread[(0*4)+3] = 1'b1;
+                    end
+                end
+
+                always @(posedge clk) begin
+                    spc0_inst_done <= `VEX_CORE0.iBus_cmd_valid & `VEX_CORE0.iBus_cmd_ready;
+                    spc0_phy_pc_w <= {{16{`VEX_CORE0.iBus_cmd_payload_pc[31]}}, `VEX_CORE0.iBus_cmd_payload_pc[31:0]};
+                end
+        `endif // RTL_VEX0
         `endif // RTL_PICO0
         `endif // RTL_ARIANE0
         `endif // RTL_SPARC0
         '''
     pattern = ["SPARC0", "PATH0", "spc0", "sas_m0", "pcs0", "pcf0", "pcd0", "pce0", \
-                "IFQDP0", "DTUPATH0", "PICO_CORE0", "ARIANE_CORE0", "active_thread[(0"];
+                "IFQDP0", "DTUPATH0", "PICO_CORE0", "ARIANE_CORE0", "VEX_CORE0", "active_thread[(0"];
     tt = ReplicatePattern(t, pattern);
     print tt;
 %>
@@ -326,8 +347,10 @@ initial begin
     done    = 0;
     good    = 0;
 `ifndef PITON_PICO
+`ifndef PITON_VEX
 `ifndef PITON_ARIANE
     active_thread = 0;
+`endif
 `endif
 `endif
     hit_bad   = 0;
@@ -337,8 +360,10 @@ end // initial begin
 always @(posedge rst_l)begin
     if(first_rst)begin
 `ifndef PITON_PICO
+`ifndef PITON_VEX
 `ifndef PITON_ARIANE
         active_thread = 0;
+`endif
 `endif
 `endif
         first_rst     = 0;

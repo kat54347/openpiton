@@ -102,6 +102,7 @@ for i in range(NUM_TILES):
     `define ARIANE_CORE%d     `TILE%d.g_ariane_core.core.ariane
     `define SPARC_CORE%d      `TILE%d.g_sparc_core.core
     `define PICO_CORE%d       `TILE%d.g_picorv32_core.core
+    `define VEX_CORE%d        `TILE%d.g_vexriscv_core.core
     `ifdef RTL_SPARC%d
     `define CORE_REF%d        `SPARC_CORE%d
     `endif // ifdef RTL_SPARC%d
@@ -111,8 +112,12 @@ for i in range(NUM_TILES):
     `ifdef RTL_PICO%d
     `define CORE_REF%d        `PICO_CORE%d
     `endif // ifdef RTL_PICO%d
+    `ifdef RTL_VEX%d
+    `define CORE_REF%d        `VEX_CORE%d
+    `endif // ifdef RTL_VEX%d
     `define CCX_TRANSDUCER%d  `TILE%d.g_sparc_core.ccx_l15_transducer
     `define PICO_TRANSDUCER%d `TILE%d.g_picorv32_core.pico_l15_transducer
+    `define VEX_TRANSDUCER%d `TILE%d.g_vexriscv_core.vex_l15_transducer
     `define L15_TOP%d         `TILE%d.l15.l15
     `define L15_PIPE%d        `TILE%d.l15.l15.pipeline
     `define DMBR%d            `TILE%d.dmbr_ins

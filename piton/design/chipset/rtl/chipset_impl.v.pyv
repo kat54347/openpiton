@@ -1074,6 +1074,10 @@ ciop_fake_iob ciop_fake_iob(
           .spc0_inst_done    (1'b1),
           .pc_w0             ({17'b0, `PICO_CORE0.reg_pc}),
         `endif
+        `ifdef RTL_VEX0
+          .spc0_inst_done    (1'b1),
+          .pc_w0             ({17'b0, `VEX_CORE0.iBus_cmd_payload_pc}),
+        `endif
         `ifdef RTL_ARIANE0
           .spc0_inst_done    ( `ARIANE_CORE0.piton_pc_vld   ),
           .pc_w0             ( `ARIANE_CORE0.piton_pc[48:0] ),
@@ -1084,10 +1088,12 @@ ciop_fake_iob ciop_fake_iob(
         #for i in range (8):
             text2 = text;
             text2 = text2.replace("PICO_CORE0", "PICO_CORE" + `i`);
+            text2 = text2.replace("VEX_CORE0", "VEX_CORE" + `i`);
             text2 = text2.replace("ARIANE_CORE0", "ARIANE_CORE" + `i`);
             text2 = text2.replace("RTL_ARIANE0", "RTL_ARIANE" + `i`);
             text2 = text2.replace("RTL_SPARC0", "RTL_SPARC" + `i`);
             text2 = text2.replace("RTL_PICO0", "RTL_PICO" + `i`);
+            text2 = text2.replace("RTL_VEX0", "RTL_VEX" + `i`);
             text2 = text2.replace("spc0_inst_done", "spc" + `i` + "_inst_done");
             text2 = text2.replace("pc_w0", "pc_w" + `i`);
             text2 = text2.replace("PCPATH0", "PCPATH" + `i`);

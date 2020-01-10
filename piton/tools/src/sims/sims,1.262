@@ -297,6 +297,7 @@ Getopt::Long::Configure ('no_auto_abbrev') ;
         'vera_run' => 1,
         'vera_vcon_file' => "",
         'version' => 0,
+        'vex' => 0,
         'vfile' => [],
         'vlint_args' => [],
         'vlint_run' => 0,
@@ -5274,6 +5275,7 @@ sub parse_args
             'vera_run!',
             'vera_vcon_file=s',
             'verbose!',
+            'vex!',
             'vfile=s@',
             'vlint_args=s@',
             'vlint_run!',
@@ -5450,8 +5452,10 @@ sub parse_args
   die ("DIE. -pico and -pico_het cannot both be set") if ($opt{pico} && $opt{pico_het}) ;
   $ENV{PITON_PICO}=$opt{pico};
   $ENV{PITON_PICO_HET}=$opt{pico_het};
+  $ENV{PITON_VEX}=$opt{vex};
   push (@{$opt{config_rtl}}, "PITON_PICO") if ($opt{pico});
   push (@{$opt{config_rtl}}, "PITON_PICO_HET") if ($opt{pico_het});
+  push (@{$opt{config_rtl}}, "PITON_VEX") if ($opt{vex});
 
   # conveniently sets up the tile RTL defines for manycore model
   if ($opt{x_tiles} && $opt{y_tiles}) {
@@ -5462,7 +5466,10 @@ sub parse_args
     for (my $i = 0; $i < ($opt{x_tiles} * $opt{y_tiles}); $i++) {
         if ($opt{pico} || ($opt{pico_het} && ($i % 2 == 1))) {
             push (@{$opt{config_rtl}}, "RTL_PICO" . $i);
-	}
+	      }
+        elsif ($opt{vex}) {
+            push (@{$opt{config_rtl}}, "RTL_VEX" . $i);
+	      }
         else {
             push (@{$opt{config_rtl}}, "RTL_SPARC" . $i);
         }
@@ -5494,7 +5501,10 @@ sub parse_args
         # print "$i\n";
         if ($opt{pico} || ($opt{pico_het} && ($i % 2 == 1))) {
             push (@{$opt{config_rtl}}, "RTL_PICO" . $i);
-	}
+	      }
+        elsif ($opt{vex}) {
+            push (@{$opt{config_rtl}}, "RTL_VEX" . $i);
+	      }
         else {
             push (@{$opt{config_rtl}}, "RTL_SPARC" . $i);
         }

@@ -430,7 +430,7 @@ system system(
     monitor   monitor(
         .clk    (`CHIP_INT_CLK),
         .cmp_gclk  (`CHIP_INT_CLK),
-        .rst_l     (`CORE_REF0.reset_l)
+        .rst_l     (~`CORE_REF0.reset)
         );
 
 `ifndef MINIMAL_MONITORING
@@ -487,7 +487,7 @@ system system(
 
 `ifndef VERILATOR
     // T1's TSO monitor, stripped of all L2 references
-    tso_mon tso_mon(`CHIP_INT_CLK, `CORE_REF0.reset_l);
+    tso_mon tso_mon(`CHIP_INT_CLK, ~`CORE_REF0.reset);
 `endif
 
     // L15 MONITORS
@@ -531,6 +531,7 @@ system system(
 //    end // initial begin
 
 `ifndef PITON_PICO
+`ifndef PITON_VEX
 `ifndef PITON_ARIANE
     sas_intf  sas_intf(/*AUTOINST*/
         // Inputs
@@ -538,14 +539,17 @@ system system(
         .rst_l     (`CORE_REF0.reset_l));       // Templated
 `endif
 `endif
+`endif
 
 `ifndef PITON_PICO
+`ifndef PITON_VEX
 `ifndef PITON_ARIANE
     // create sas tasks
     sas_tasks sas_tasks(/*AUTOINST*/
         // Inputs
         .clk      (`CHIP_INT_CLK),      // Templated
         .rst_l        (`CORE_REF0.reset_l));       // Templated
+`endif
 `endif
 `endif
 

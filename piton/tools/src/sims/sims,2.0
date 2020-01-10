@@ -230,6 +230,7 @@ Getopt::Long::Configure ('no_auto_abbrev') ;
         'vlt_build_args' => [],
         'vlt_run' => 0,
         'version' => 0,
+        'vex' => 0,
         'vfile' => [],
         'mem_init_py' => ""
        );
@@ -331,6 +332,7 @@ GetOptions (\%opt,
             'simslog!',
             'simslog_name=s',
             'build_id=s',
+            'vex!',
            ) ;
 
 ################################################################################
@@ -2134,8 +2136,8 @@ sub assemble_diag
     if ($opt{asm_diag_name} =~ /\.pal/)        { $diag_name = "diag.pal"  ; }
     elsif ($opt{asm_diag_name} =~ /\.s\.gz/)   { $diag_name = "diag.s.gz" ; }
     elsif ($opt{precompiled} and $opt{ariane}) { $diag_name = "diag.exe"  ; }
-    elsif (($opt{pico} | $opt{ariane}) and ($opt{asm_diag_name} =~ /\.S/)) { $diag_name = "diag.S" ; }
-    elsif (($opt{pico} | $opt{ariane}) and ($opt{asm_diag_name} =~ /\.c/)) { $diag_name = "diag.c" ; }
+    elsif (($opt{pico} | $opt{ariane} | $opt{vex}) and ($opt{asm_diag_name} =~ /\.S/)) { $diag_name = "diag.S" ; }
+    elsif (($opt{pico} | $opt{ariane} | $opt{vex}) and ($opt{asm_diag_name} =~ /\.c/)) { $diag_name = "diag.c" ; }
     else { $diag_name = "diag.s" ; }
 
     # copy diagnostic to run area
@@ -2179,6 +2181,16 @@ sub assemble_diag
     if ($opt{pico}) {
       # RISCV flow for RV32IM (PICORV32)
       print "$prg: assembling 32bit riscv diag (RV32IM)\n" ;
+      my $cmd = "rv32_as " ;
+      #$cmd .= join (" ", @{$opt{midas_args}}) ;
+      print "$prg: $cmd\n";
+
+      my $waitstatus = call_program($cmd, "rv32_as.log");
+      die ("DIE. rv32_as compilation error") if ($waitstatus) ;
+
+    } elsif ($opt{vex}) {
+      # RISCV flow for RV32IMCA (VEXRISCV)
+      print "$prg: assembling 32bit riscv diag (RV32IMCA)\n" ;
       my $cmd = "rv32_as " ;
       #$cmd .= join (" ", @{$opt{midas_args}}) ;
       print "$prg: $cmd\n";
@@ -2631,16 +2643,20 @@ sub parse_args
 
   die ("DIE. -ariane and -pico/-pico_het cannot be set simultaneously") if ($opt{ariane} && ($opt{pico} || $opt{pico_het})) ;
   die ("DIE. -pico and -pico_het cannot both be set") if ($opt{pico} && $opt{pico_het}) ;
+  die ("DIE. -ariane and -vex cannot be set simultaneously") if ($opt{ariane} && $opt{vex}) ;
+  die ("DIE. -vex and -pico/-pico_het cannot be set simultaneously") if ($opt{vex} && ($opt{pico} || $opt{pico_het})) ;
   $ENV{PITON_PICO}     = $opt{pico};
   $ENV{PITON_PICO_HET} = $opt{pico_het};
   $ENV{PITON_ARIANE}   = $opt{ariane};
+  $ENV{PITON_VEX}      = $opt{vex};
   push (@{$opt{config_rtl}}, "PITON_PICO")     if ($opt{pico});
   push (@{$opt{config_rtl}}, "PITON_PICO_HET") if ($opt{pico_het});
   push (@{$opt{config_rtl}}, "PITON_ARIANE")   if ($opt{ariane});
   push (@{$opt{config_rtl}}, "WT_DCACHE")      if ($opt{ariane});
+  push (@{$opt{config_rtl}}, "PITON_VEX")      if ($opt{vex});
 
 
-  if ($opt{pico} or $opt{pico_het} or $opt{ariane}) {
+  if ($opt{pico} or $opt{pico_het} or $opt{ariane} or $opt{vex}) {
     push (@{$opt{config_rtl}}, "NO_MRA_VAL") ;
     push (@{$opt{config_rtl}}, "NO_SLAM_RANDOM") ;
   }
@@ -2674,7 +2690,9 @@ sub parse_args
         push (@{$opt{config_rtl}}, "RTL_PICO" . $i);
     } elsif ($opt{ariane}) {
         push (@{$opt{config_rtl}}, "RTL_ARIANE" . $i);
-    } else {
+    } elsif ($opt{vex}) {
+        push (@{$opt{config_rtl}}, "RTL_VEX" . $i);
+    }else {
         push (@{$opt{config_rtl}}, "RTL_SPARC" . $i);
     }
   }
@@ -2956,6 +2974,11 @@ VERILOG COMPILATION RELATED
     -ariane
            this specifies that the ARIANE RV64GC core shall be used instead of OpenSPARC.
            in this case, programs are compiled and assembled using the RISCV GCC toolchain.
+
+    -vex
+           this specifies that the VexRiscv core shall be used instead of OpenSPARC.
+           in this case, programs are compiled and assembled using the RISCV GCC toolchain.
+
 
 VERILOG RUNTIME RELATED
 
